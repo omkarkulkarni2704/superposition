@@ -9,6 +9,8 @@ fn main() {
         csbindgen::Builder::default()
         .input_extern_file("src/interface.rs")
         .csharp_dll_name("libexperimentation_client")
-        .generate_csharp_file("../../clients/csharp/experimentation_client.g.cs")
+        .csharp_class_name("Client")
+        .csharp_namespace("LibExperimentationClient")
+        .generate_csharp_file("../../clients/csharp/libs/LibExperimentationClient.g.cs")
         .unwrap();
 }

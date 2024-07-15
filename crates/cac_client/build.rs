@@ -9,6 +9,8 @@ fn main() {
     csbindgen::Builder::default()
         .input_extern_file("src/interface.rs")
         .csharp_dll_name("libcac_client")
-        .generate_csharp_file("../../clients/csharp/cac_client.g.cs")
+        .csharp_class_name("Client")
+        .csharp_namespace("LibCacClient")
+        .generate_csharp_file("../../clients/csharp/libs/LibCacClient.g.cs")
         .unwrap();
 }

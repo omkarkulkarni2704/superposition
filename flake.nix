@@ -44,6 +44,12 @@
             jq
             nodejs_18
             nixpkgs-fmt
+            # client languages
+            #csharp
+            dotnet-sdk_8
+            omnisharp-roslyn
+            mono
+            msbuild
           ];
         };
       };

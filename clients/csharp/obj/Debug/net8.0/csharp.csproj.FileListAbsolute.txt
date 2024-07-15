@@ -1,0 +1,5 @@
+/Users/kartik.gajendra/superposition/clients/csharp/obj/Debug/net8.0/csharp.GeneratedMSBuildEditorConfig.editorconfig
+/Users/kartik.gajendra/superposition/clients/csharp/obj/Debug/net8.0/csharp.AssemblyInfoInputs.cache
+/Users/kartik.gajendra/superposition/clients/csharp/obj/Debug/net8.0/csharp.AssemblyInfo.cs
+/Users/kartik.gajendra/superposition/clients/csharp/obj/Debug/net8.0/csharp.csproj.CoreCompileInputs.cache
+/Users/kartik.gajendra/superposition/clients/csharp/obj/Debug/net8.0/csharp.sourcelink.json
