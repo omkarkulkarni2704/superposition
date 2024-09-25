@@ -9,7 +9,7 @@ use crate::types::{DefaultConfig, Dimension, VariantFormT, VariantType};
 use leptos::*;
 use web_sys::MouseEvent;
 
-use super::condition_pills::types::Condition;
+use super::context_form::types::Condition;
 
 fn default_variants_for_form() -> Vec<(String, VariantFormT)> {
     vec![

@@ -12,6 +12,8 @@ use crate::{
     schema::{EnumVariants, HtmlDisplay, JsonSchemaType, SchemaType},
 };
 
+use super::context_form::types::Operator;
+
 #[derive(Debug, Clone, PartialEq)]
 pub enum InputType {
     Text,
@@ -64,7 +66,30 @@ impl From<(SchemaType, EnumVariants)> for InputType {
     }
 }
 
-fn str_to_value(s: &str, type_: &JsonSchemaType) -> Result<Value, String> {
+impl From<(SchemaType, EnumVariants, Operator)> for InputType {
+    fn from(
+        (schema_type, enum_variants, operator): (SchemaType, EnumVariants, Operator),
+    ) -> Self {
+        if !enum_variants.is_empty() {
+            return InputType::Select(enum_variants);
+        }
+
+        if operator == Operator::In {
+            return InputType::Text;
+        }
+
+        match schema_type {
+            SchemaType::Single(JsonSchemaType::Number) => InputType::Number,
+            SchemaType::Single(JsonSchemaType::Integer) => InputType::Integer,
+            SchemaType::Single(JsonSchemaType::Boolean) => InputType::Toggle,
+            SchemaType::Single(JsonSchemaType::Null) => InputType::Disabled,
+            _ => InputType::Text,
+        }
+    }
+}
+
+// TODO: Also add schema validation in frontend :::::
+fn parse(s: &str, type_: &JsonSchemaType) -> Result<Value, String> {
     match type_ {
         JsonSchemaType::String => Ok(Value::String(s.to_string())),
         JsonSchemaType::Number => s
@@ -90,14 +115,37 @@ fn str_to_value(s: &str, type_: &JsonSchemaType) -> Result<Value, String> {
     }
 }
 
-fn parse_input_value(value: String, schema_type: SchemaType) -> Result<Value, String> {
+fn parse_with_operator(
+    s: &str,
+    type_: &JsonSchemaType,
+    op: &Operator,
+) -> Result<Value, String> {
+    match op {
+        Operator::In => {
+            let s_vec = serde_json::from_str::<Vec<String>>(s)
+                .map_err(|_| "not a valid array".to_string())?;
+            let mut val: Vec<Value> = vec![];
+            for s in s_vec.iter() {
+                val.push(parse(s, type_)?);
+            }
+            Ok(Value::Array(val))
+        }
+        _ => parse(s, type_),
+    }
+}
+
+fn parse_input(
+    value: String,
+    schema_type: SchemaType,
+    op: &Option<Operator>,
+) -> Result<Value, String> {
     match schema_type {
-        SchemaType::Single(ref type_) => str_to_value(&value, type_),
+        SchemaType::Single(ref type_) => parse(&value, type_),
         SchemaType::Multiple(mut types) => {
             types.sort_by(|a, b| a.precedence().cmp(&b.precedence()));
 
             for type_ in types.iter() {
-                let v = str_to_value(&value, type_);
+                let v = parse(&value, type_);
                 if v.is_ok() {
                     return v;
                 }
@@ -183,6 +231,7 @@ fn basic_input(
     value: Value,
     schema_type: SchemaType,
     on_change: Callback<Value, ()>,
+    #[prop(default = None)] operator: Option<Operator>,
 ) -> impl IntoView {
     let schema_type = store_value(schema_type);
     let (error_rs, error_ws) = create_signal::<Option<String>>(None);
@@ -208,7 +257,7 @@ fn basic_input(
                 value=value.html_display()
                 on:change=move |e| {
                     let v = event_target_value(&e);
-                    match parse_input_value(v, schema_type.get_value()) {
+                    match parse_input(v, schema_type.get_value(), &operator) {
                         Ok(v) => {
                             on_change.call(v);
                             error_ws.set(None);
@@ -226,9 +275,10 @@ fn basic_input(
                                 <i class="ri-close-circle-line"></i>
                                 {err}
                             </span>
-                        }.into_view()
-                    },
-                    None => ().into_view()
+                        }
+                            .into_view()
+                    }
+                    None => ().into_view(),
                 }
             }}
 
@@ -243,6 +293,7 @@ pub fn monaco_input(
     value: Value,
     on_change: Callback<Value, ()>,
     schema_type: SchemaType,
+    #[prop(default = None)] operator: Option<Operator>,
 ) -> impl IntoView {
     let id = store_value(id);
     let schema_type = store_value(schema_type);
@@ -272,7 +323,7 @@ pub fn monaco_input(
         logging::log!("Saving editor value: {}", editor_value);
 
         let parsed_value =
-            parse_input_value(editor_value.clone(), schema_type.get_value());
+            parse_input(editor_value.clone(), schema_type.get_value(), &operator);
         match parsed_value {
             Ok(v) => {
                 logging::log!("Saving parsed value: {}", editor_value);
@@ -426,6 +477,7 @@ pub fn input(
     #[prop(into, default = String::new())] id: String,
     #[prop(into, default = String::new())] class: String,
     #[prop(into, default = String::new())] name: String,
+    #[prop(default = None)] operator: Option<Operator>
 ) -> impl IntoView {
     match r#type {
         InputType::Toggle => match value.as_bool() {
@@ -437,7 +489,7 @@ pub fn input(
         InputType::Select(ref options) => view! { <Select id name class value on_change disabled options=options.0.clone()/> }
         .into_view(),
         InputType::Monaco => {
-            view! { <MonacoInput id class value on_change schema_type/> }.into_view()
+            view! { <MonacoInput id class value on_change schema_type operator/> }.into_view()
         }
         _ => {
             view! {
@@ -451,6 +503,7 @@ pub fn input(
                     value=value
                     schema_type=schema_type
                     on_change=on_change
+                    operator=operator
                 />
             }
         }

@@ -1,5 +1,5 @@
 use crate::{
-    components::condition_pills::types::{Condition, ConditionOperator},
+    components::condition_pills::types::{Condition, Operator},
     types::Dimension,
     utils::{
         construct_request_headers, get_config_value, get_host, parse_json_response,
@@ -13,9 +13,9 @@ pub fn get_condition_schema(
     condition: &Condition,
     dimensions: Vec<Dimension>,
 ) -> Result<Value, String> {
-    let var = &condition.left_operand; // Dimension name
+    let var = &condition.dimension; // Dimension name
     let op = &condition.operator; // Operator type
-    let val = &condition.right_operand; // Vec<Value>
+    let val = &condition.operands; // Vec<Value>
 
     // Extract non-"var" elements from the right_operand
     let filtered_values: Vec<&Value> = val
@@ -25,7 +25,7 @@ pub fn get_condition_schema(
     let dimensions_clone = dimensions.clone();
 
     match op {
-        ConditionOperator::Between => {
+        Operator::Between => {
             // Expecting three elements for "Between" condition: two operands and one "var" object
             if filtered_values.len() != 2 {
                 return Err(
@@ -62,7 +62,7 @@ pub fn get_condition_schema(
                 ]
             }))
         }
-        ConditionOperator::Is => {
+        Operator::Is => {
             // Expecting two elements for "Is" condition: one "var" object and one value
             if filtered_values.len() != 1 {
                 return Err("Invalid number of operands for 'is' condition.".to_string());
@@ -85,7 +85,7 @@ pub fn get_condition_schema(
                 ]
             }))
         }
-        ConditionOperator::In => {
+        Operator::In => {
             if filtered_values.len() != 1 {
                 return Err("Invalid number of operands for 'in' condition.".to_string());
             }
@@ -106,7 +106,7 @@ pub fn get_condition_schema(
                 ]
             }))
         }
-        ConditionOperator::Has => {
+        Operator::Has => {
             if filtered_values.len() != 1 {
                 return Err("Invalid number of operands for 'has' condition.".to_string());
             }
@@ -127,7 +127,7 @@ pub fn get_condition_schema(
                 ]
             }))
         }
-        ConditionOperator::Other(op) => {
+        Operator::Other(op) => {
             if filtered_values.len() == 1 {
                 let value = &filtered_values[0]; // The value after "var"
                 let first_operand_value = get_config_value(
