@@ -2,7 +2,7 @@ pub mod types;
 pub mod utils;
 use std::collections::{HashMap, HashSet};
 
-use crate::components::input::InputType;
+use crate::components::input::{Input, InputType};
 use crate::schema::EnumVariants;
 use crate::types::Dimension;
 use crate::{
@@ -20,18 +20,18 @@ pub fn condition_input(
     disabled: bool,
     resolve_mode: bool,
     allow_remove: bool,
-    schema_type: SchemaType,
-    enum_variants: EnumVariants,
     condition: StoredValue<Condition>,
-    on_remove: Callback<String, ()>,
-    on_operator_change: Callback<(OperatorInput, String, SchemaType), ()>,
+    input_type: StoredValue<InputType>,
+    schema_type: StoredValue<SchemaType>,
+    #[prop(into)] on_remove: Callback<String, ()>,
+    #[prop(into)] on_value_change: Callback<(usize, Value), ()>,
+    #[prop(into)] on_operator_change: Callback<OperatorInput, ()>,
 ) -> impl IntoView {
     let Condition {
         dimension,
         operator,
         operands,
     } = condition.get_value();
-    let operand_list = operands.0.clone();
 
     view! {
         <div class="flex gap-x-6">
@@ -55,12 +55,7 @@ pub fn condition_input(
                     disabled=disabled || resolve_mode
                     value=operator.to_string()
                     on:input=move |event| {
-                        on_operator_change
-                            .call((
-                                OperatorInput(event_target_value(&event)),
-                                condition.with_value(|v| v.dimension.clone()),
-                                schema_type.clone(),
-                            ));
+                        on_operator_change.call(OperatorInput(event_target_value(&event)));
                     }
 
                     name="context-dimension-operator"
@@ -98,8 +93,33 @@ pub fn condition_input(
                         .into_iter()
                         .enumerate()
                         .map(|(idx, operand): (usize, Operand)| {
-                            view! {
+                            match operand {
+                                Operand::Dimension(_) => view! {}.into_view(),
+                                Operand::Value(v) => {
+                                    view! {
+                                        <Input
+                                            value=v
+                                            schema_type=schema_type.get_value()
+                                            on_change=move |value: Value| {
+                                                on_value_change.call((idx, value));
+                                            }
 
+                                            r#type=input_type.get_value()
+                                            disabled=disabled
+                                            id=format!(
+                                                "{}-{}",
+                                                condition
+                                                    .with_value(|v| format!("{}-{}", v.dimension, v.operator)),
+                                                idx,
+                                            )
+
+                                            class=""
+                                            name=""
+                                            operator=Some(condition.with_value(|v| v.operator.clone()))
+                                        />
+                                    }
+                                        .into_view()
+                                }
                             }
                         })
                         .collect_view()} <Show when=move || allow_remove>
@@ -125,14 +145,14 @@ pub fn context_form<NF>(
     handle_change: NF,
     dimensions: Vec<Dimension>,
     #[prop(default = false)] is_standalone: bool,
-    context: Vec<Condition>,
+    context: Conditions,
     #[prop(default = String::new())] heading_sub_text: String,
     #[prop(default = false)] disabled: bool,
     #[prop(default = DropdownDirection::Right)] dropdown_direction: DropdownDirection,
     #[prop(default = false)] resolve_mode: bool,
 ) -> impl IntoView
 where
-    NF: Fn(Vec<Condition>) + 'static,
+    NF: Fn(Conditions) + 'static,
 {
     let dimension_map = store_value(
         dimensions
@@ -192,11 +212,11 @@ where
     });
 
     let on_operator_change = Callback::new(
-        move |(idx, op_input, d_name, d_type): (
+        move |(idx, d_name, d_type, op_input): (
             usize,
-            OperatorInput,
             String,
             SchemaType,
+            OperatorInput,
         )| {
             set_context.update(|v| {
                 if idx < v.len() {
@@ -259,6 +279,7 @@ where
                         each=move || {
                             context
                                 .get()
+                                .0
                                 .into_iter()
                                 .enumerate()
                                 .collect::<Vec<(usize, Condition)>>()
@@ -269,7 +290,6 @@ where
                         }
 
                         children=move |(idx, condition)| {
-                            let dimension_name = store_value(condition.dimension.clone());
                             let schema = dimension_map
                                 .with_value(|v| {
                                     v.get(&condition.dimension).unwrap().schema.clone()
@@ -279,25 +299,43 @@ where
                             );
                             let enum_variants = EnumVariants::try_from(schema);
                             let allow_remove = !disabled
-                                && !mandatory_dimensions
-                                    .get_value()
-                                    .contains(&dimension_name.get_value());
-                            if let Operator::Other(ref op_str) = condition.operator {
-                                if op_str.is_empty() {
-                                    set_context
-                                        .update_untracked(|curr_context| {
-                                            curr_context[idx].operator = Operator::Is;
-                                        });
-                                    let mut_operator = String::from("==");
-                                    set_context
-                                        .update_untracked(|curr_context| {
-                                            curr_context[idx]
-                                                .operator = Operator::Other(mut_operator.clone());
-                                        });
-                                }
-                            }
-                            let input_type = InputType::from();
+                                && !mandatory_dimensions.get_value().contains(&condition.dimension);
+                            let input_type = store_value(
+                                InputType::from((
+                                    schema_type.get_value(),
+                                    enum_variants.unwrap(),
+                                    condition.operator.clone(),
+                                )),
+                            );
+                            let condition = store_value(condition);
+
+                            let on_remove = move |d_name| on_remove.call((idx, d_name));
+                            let on_value_change = move |(operand_idx, value)| {
+                                on_value_change.call((idx, operand_idx, value))
+                            };
+                            let on_operator_change = move |operator| {
+                                on_operator_change
+                                    .call((
+                                        idx,
+                                        condition.with_value(|v| v.dimension.clone()),
+                                        schema_type.get_value(),
+                                        operator,
+                                    ))
+                            };
                             view! {
+                                // TODO: get rid of unwraps here
+
+                                <ConditionInput
+                                    disabled
+                                    resolve_mode
+                                    allow_remove
+                                    condition
+                                    input_type
+                                    schema_type
+                                    on_remove
+                                    on_value_change
+                                    on_operator_change
+                                />
                                 {move || {
                                     if last_idx.get() != idx {
                                         view! {

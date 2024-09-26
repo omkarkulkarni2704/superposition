@@ -5,6 +5,7 @@ use crate::components::button::Button;
 use crate::components::condition_pills::types::{Condition, ConditionOperator};
 use crate::components::condition_pills::utils::extract_conditions;
 use crate::components::context_card::ContextCard;
+use crate::components::context_form::types::Conditions;
 use crate::components::context_form::utils::{create_context, update_context};
 use crate::components::context_form::ContextForm;
 use crate::components::delete_modal::DeleteModal;
@@ -41,7 +42,7 @@ enum FormMode {
 
 #[component]
 fn form(
-    context: Vec<Condition>,
+    context: Conditions,
     overrides: Vec<(String, Value)>,
     dimensions: Vec<Dimension>,
     edit: bool,
@@ -59,13 +60,11 @@ fn form(
         spawn_local(async move {
             let f_context = context.get();
             let f_overrides = overrides.get();
-            let dimensions = dimensions.get_value().clone();
             let result = if edit {
                 update_context(
                     tenant_rs.get().clone(),
                     Map::from_iter(f_overrides),
                     f_context,
-                    dimensions.clone(),
                 )
                 .await
             } else {
@@ -73,7 +72,6 @@ fn form(
                     tenant_rs.get().clone(),
                     Map::from_iter(f_overrides),
                     f_context,
-                    dimensions.clone(),
                 )
                 .await
             };

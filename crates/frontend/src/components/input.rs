@@ -139,13 +139,20 @@ fn parse_input(
     schema_type: SchemaType,
     op: &Option<Operator>,
 ) -> Result<Value, String> {
+    let parse_single = |r#type: &JsonSchemaType| {
+        match op {
+            Some(op) => parse_with_operator(&value, r#type, op),
+            None => parse(&value, r#type)
+        }
+    };
+
     match schema_type {
-        SchemaType::Single(ref type_) => parse(&value, type_),
+        SchemaType::Single(ref r#type) => parse_single(r#type),
         SchemaType::Multiple(mut types) => {
             types.sort_by(|a, b| a.precedence().cmp(&b.precedence()));
 
-            for type_ in types.iter() {
-                let v = parse(&value, type_);
+            for r#type in types.iter() {
+                let v = parse_single(r#type);
                 if v.is_ok() {
                     return v;
                 }
@@ -471,7 +478,7 @@ pub fn monaco_input(
 pub fn input(
     value: Value,
     schema_type: SchemaType,
-    on_change: Callback<Value, ()>,
+    #[prop(into)]on_change: Callback<Value, ()>,
     #[prop(into)] r#type: InputType,
     #[prop(default = false)] disabled: bool,
     #[prop(into, default = String::new())] id: String,

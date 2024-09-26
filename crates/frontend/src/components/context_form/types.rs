@@ -133,6 +133,11 @@ pub struct Condition {
     pub operands: Operands,
 }
 
+#[derive(
+    Clone, Debug, derive_more::Deref, derive_more::DerefMut, Serialize, Deserialize,
+)]
+pub struct Conditions(pub Vec<Condition>);
+
 impl TryFrom<(Operator, String, SchemaType)> for Condition {
     type Error = String;
     fn try_from(
@@ -186,6 +191,30 @@ impl TryFrom<&Value> for Condition {
     }
 }
 
+impl Into<Value> for Condition {
+    fn into(self) -> Value {
+        let operator = match self.operator {
+            Operator::In | Operator::Has => "in".to_owned(),
+            Operator::Is => "==".to_owned(),
+            Operator::Between => "<=".to_owned(),
+            Operator::Other(op) => op,
+        };
+
+        let operands = self
+            .operands
+            .clone()
+            .0
+            .into_iter()
+            .map(|v| match v {
+                Operand::Dimension(d) => d,
+                Operand::Value(v) => v,
+            })
+            .collect::<Vec<Value>>();
+
+        json!({ operator: operands })
+    }
+}
+
 impl TryFrom<&Context> for Vec<Condition> {
     type Error = &'static str;
     fn try_from(context: &Context) -> Result<Self, Self::Error> {
@@ -204,5 +233,40 @@ impl TryFrom<&Context> for Vec<Condition> {
                     }),
                 None => Condition::try_from(obj).map(|v| vec![v]),
             })
+    }
+}
+
+impl TryFrom<&Context> for Conditions {
+    type Error = &'static str;
+    fn try_from(context: &Context) -> Result<Self, Self::Error> {
+        Ok(Conditions(
+            context
+                .condition
+                .as_object()
+                .ok_or("failed to parse context.condition as an object")
+                .and_then(|obj| match obj.get("and") {
+                    Some(v) => v
+                        .as_array()
+                        .ok_or("failed to parse value of and as array")
+                        .and_then(|arr| {
+                            arr.iter().map(Condition::try_from).collect::<Result<
+                                Vec<Condition>,
+                                &'static str,
+                            >>(
+                            )
+                        }),
+                    None => Condition::try_from(obj).map(|v| vec![v]),
+                })?,
+        ))
+    }
+}
+
+impl Into<Value> for Conditions {
+    fn into(self) -> Value {
+        let conditions = self
+            .iter()
+            .map(|v| v.clone().into())
+            .collect::<Vec<Value>>();
+        json!({ "and": conditions })
     }
 }
