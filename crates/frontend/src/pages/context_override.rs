@@ -23,7 +23,7 @@ use serde_json::{json, Map, Value};
 
 #[derive(Clone, Debug, Default)]
 pub struct Data {
-    pub context: Vec<Condition>,
+    pub context: Conditions,
     pub overrides: Vec<(String, Value)>,
 }
 

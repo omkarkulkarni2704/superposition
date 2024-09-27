@@ -1,13 +1,15 @@
 use leptos::{ReadSignal, WriteSignal};
 use serde::{Deserialize, Serialize};
-use std::{str::FromStr, vec::Vec};
+use std::{borrow::Borrow, str::FromStr, vec::Vec};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use derive_more::{Deref, DerefMut};
 use serde_json::{json, Map, Value};
 
 use crate::components::{
-    condition_pills::{types::Condition, utils::extract_conditions}, context_form::types::Conditions, dropdown::utils::DropdownOption
+    condition_pills::{types::Condition, utils::extract_conditions},
+    context_form::types::Conditions,
+    dropdown::utils::DropdownOption,
 };
 
 #[derive(Clone, Debug)]
@@ -206,7 +208,8 @@ impl From<ExperimentResponse> for Experiment {
             last_modified: value.last_modified,
             chosen_variant: value.chosen_variant,
             variants: serde_json::from_value(value.variants).unwrap_or_default(),
-            context: extract_conditions(&value.context),
+            context: Conditions::from_context_json(value.context)
+                .unwrap_or(Conditions(vec![])),
         }
     }
 }

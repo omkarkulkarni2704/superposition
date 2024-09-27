@@ -134,7 +134,7 @@ pub struct Condition {
 }
 
 #[derive(
-    Clone, Debug, derive_more::Deref, derive_more::DerefMut, Serialize, Deserialize,
+    Clone, Debug, derive_more::Deref, derive_more::DerefMut, Serialize, Deserialize, Default
 )]
 pub struct Conditions(pub Vec<Condition>);
 
@@ -202,12 +202,10 @@ impl Into<Value> for Condition {
 
         let operands = self
             .operands
-            .clone()
-            .0
-            .into_iter()
+            .iter()
             .map(|v| match v {
-                Operand::Dimension(d) => d,
-                Operand::Value(v) => v,
+                Operand::Dimension(d) => d.clone(),
+                Operand::Value(v) => v.clone(),
             })
             .collect::<Vec<Value>>();
 
@@ -215,33 +213,17 @@ impl Into<Value> for Condition {
     }
 }
 
-impl TryFrom<&Context> for Vec<Condition> {
-    type Error = &'static str;
-    fn try_from(context: &Context) -> Result<Self, Self::Error> {
-        context
-            .condition
-            .as_object()
-            .ok_or("failed to parse context.condition as an object")
-            .and_then(|obj| match obj.get("and") {
-                Some(v) => v
-                    .as_array()
-                    .ok_or("failed to parse value of and as array")
-                    .and_then(|arr| {
-                        arr.iter()
-                            .map(Condition::try_from)
-                            .collect::<Result<Vec<Condition>, &'static str>>()
-                    }),
-                None => Condition::try_from(obj).map(|v| vec![v]),
-            })
-    }
-}
-
 impl TryFrom<&Context> for Conditions {
     type Error = &'static str;
     fn try_from(context: &Context) -> Result<Self, Self::Error> {
+        Self::from_context_json(context.condition.clone())
+    }
+}
+
+impl Conditions {
+    pub fn from_context_json(context: Value) -> Result<Self, &'static str> {
         Ok(Conditions(
             context
-                .condition
                 .as_object()
                 .ok_or("failed to parse context.condition as an object")
                 .and_then(|obj| match obj.get("and") {
