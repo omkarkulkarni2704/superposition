@@ -5,7 +5,7 @@ use anyhow::Result;
 use serde_json::{json, Map, Value};
 
 pub fn context_payload(overrides: Map<String, Value>, conditions: Conditions) -> Value {
-    let context: Value = conditions.into();
+    let context: Value = conditions.to_context_json();
     let payload = json!({
         "override": overrides,
         "context": context

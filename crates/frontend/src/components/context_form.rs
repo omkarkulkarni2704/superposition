@@ -25,7 +25,7 @@ pub fn condition_input(
     schema_type: StoredValue<SchemaType>,
     #[prop(into)] on_remove: Callback<String, ()>,
     #[prop(into)] on_value_change: Callback<(usize, Value), ()>,
-    #[prop(into)] on_operator_change: Callback<OperatorInput, ()>,
+    #[prop(into)] on_operator_change: Callback<Operator, ()>,
 ) -> impl IntoView {
     let Condition {
         dimension,
@@ -55,7 +55,8 @@ pub fn condition_input(
                     disabled=disabled || resolve_mode
                     value=operator.to_string()
                     on:input=move |event| {
-                        on_operator_change.call(OperatorInput(event_target_value(&event)));
+                        on_operator_change
+                            .call(Operator::from_operator_input(event_target_value(&event)));
                     }
 
                     name="context-dimension-operator"
@@ -212,15 +213,9 @@ where
     });
 
     let on_operator_change = Callback::new(
-        move |(idx, d_name, d_type, op_input): (
-            usize,
-            String,
-            SchemaType,
-            OperatorInput,
-        )| {
+        move |(idx, d_name, d_type, operator): (usize, String, SchemaType, Operator)| {
             set_context.update(|v| {
                 if idx < v.len() {
-                    let operator: Operator = op_input.into();
                     v[idx].operator = operator.clone();
                     v[idx].operands = Operands::try_from((operator, d_name, d_type))
                         .unwrap_or(Operands(vec![]))
@@ -237,7 +232,7 @@ where
                     if operand_idx < operands.len()
                         && matches!(operands[operand_idx], Operand::Value(_))
                     {
-                        v[idx].operands[operand_idx] = value.into();
+                        v[idx].operands[operand_idx] = Operand::from_operand_json(value);
                     }
                 }
             })
@@ -308,7 +303,6 @@ where
                                 )),
                             );
                             let condition = store_value(condition);
-
                             let on_remove = move |d_name| on_remove.call((idx, d_name));
                             let on_value_change = move |(operand_idx, value)| {
                                 on_value_change.call((idx, operand_idx, value))

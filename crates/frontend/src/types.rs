@@ -1,15 +1,13 @@
 use leptos::{ReadSignal, WriteSignal};
 use serde::{Deserialize, Serialize};
-use std::{borrow::Borrow, str::FromStr, vec::Vec};
+use std::{str::FromStr, vec::Vec};
 
 use chrono::{DateTime, NaiveDateTime, Utc};
 use derive_more::{Deref, DerefMut};
 use serde_json::{json, Map, Value};
 
 use crate::components::{
-    condition_pills::{types::Condition, utils::extract_conditions},
-    context_form::types::Conditions,
-    dropdown::utils::DropdownOption,
+    context_form::types::Conditions, dropdown::utils::DropdownOption,
 };
 
 #[derive(Clone, Debug)]

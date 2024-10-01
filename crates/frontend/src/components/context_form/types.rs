@@ -7,16 +7,13 @@ use crate::{schema::SchemaType, types::Context};
 use derive_more::{Deref, DerefMut};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OperatorInput(pub String);
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Operand {
     Value(serde_json::Value),
     Dimension(serde_json::Value),
 }
 
-impl From<Value> for Operand {
-    fn from(value: Value) -> Self {
+impl Operand {
+    pub fn from_operand_json(value: Value) -> Self {
         match value {
             Value::Object(ref o) if o.contains_key("var") => Operand::Dimension(value),
             v => Operand::Value(v),
@@ -31,14 +28,11 @@ impl FromIterator<Value> for Operands {
     fn from_iter<T: IntoIterator<Item = Value>>(iter: T) -> Self {
         Operands(
             iter.into_iter()
-                .map(Operand::from)
+                .map(Operand::from_operand_json)
                 .collect::<Vec<Operand>>(),
         )
     }
 }
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct DimensionName(pub String);
 
 impl TryFrom<(Operator, String, SchemaType)> for Operands {
     type Error = String;
@@ -77,6 +71,18 @@ pub enum Operator {
     Other(String),
 }
 
+impl Operator {
+    pub fn from_operator_input(source: String) -> Self {
+        match source.as_str() {
+            "==" => Operator::Is,
+            "<=" => Operator::Between,
+            "in" => Operator::In,
+            "has" => Operator::Has,
+            other => Operator::Other(other.to_string()),
+        }
+    }
+}
+
 impl Display for Operator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -89,38 +95,19 @@ impl Display for Operator {
     }
 }
 
-impl From<OperatorInput> for Operator {
-    fn from(op: OperatorInput) -> Self {
-        match op.0.as_str() {
-            "==" => Operator::Is,
-            "<=" => Operator::Between,
-            "in" => Operator::In,
-            "has" => Operator::Has,
-            other => Operator::Other(other.to_string()),
-        }
-    }
-}
-
-impl From<(String, &Vec<Value>)> for Operator {
-    fn from(value: (String, &Vec<Value>)) -> Self {
-        let (operator, operands) = value;
+impl From<(String, &Operands)> for Operator {
+    fn from((operator, operands): (String, &Operands)) -> Self {
         let operand_0 = operands.first();
         let operand_1 = operands.get(1);
         let operand_2 = operands.get(2);
         match (operator.as_str(), operand_0, operand_1, operand_2) {
             // assuming there will be only two operands, one with the dimension name and other with the value
             ("==", _, _, None) => Operator::Is,
-            ("<=", Some(_), Some(Value::Object(a)), Some(_)) if a.contains_key("var") => {
-                Operator::Between
-            }
+            ("<=", Some(_), Some(Operand::Dimension(_)), Some(_)) => Operator::Between,
             // assuming there will be only two operands, one with the dimension name and other with the value
-            ("in", Some(Value::Object(a)), Some(_), None) if a.contains_key("var") => {
-                Operator::In
-            }
+            ("in", Some(Operand::Dimension(_)), Some(_), None) => Operator::In,
             // assuming there will be only two operands, one with the dimension name and other with the value
-            ("in", Some(_), Some(Value::Object(a)), None) if a.contains_key("var") => {
-                Operator::Has
-            }
+            ("in", Some(_), Some(Operand::Dimension(_)), None) => Operator::Has,
             _ => Operator::Other(operator),
         }
     }
@@ -133,66 +120,53 @@ pub struct Condition {
     pub operands: Operands,
 }
 
-#[derive(
-    Clone, Debug, derive_more::Deref, derive_more::DerefMut, Serialize, Deserialize, Default
-)]
-pub struct Conditions(pub Vec<Condition>);
-
-impl TryFrom<(Operator, String, SchemaType)> for Condition {
-    type Error = String;
-    fn try_from(
-        (operator, d_name, r#type): (Operator, String, SchemaType),
-    ) -> Result<Self, Self::Error> {
-        Ok(Condition {
-            dimension: d_name.clone(),
-            operator: operator.clone(),
-            operands: Operands::try_from((operator, d_name, r#type))?,
-        })
+impl Condition {
+    fn try_dimension_name_from_operands(
+        operands: &Operands,
+    ) -> Result<String, &'static str> {
+        for operand in operands.iter() {
+            if let Operand::Dimension(Value::Object(var)) = operand {
+                if let Some(d_val) = var.get("var") {
+                    return d_val
+                        .as_str()
+                        .map(|v| v.to_owned())
+                        .ok_or("Not a valid dimension name string");
+                }
+            }
+        }
+        Err("Dimension doesn't exist in operands list")
     }
-}
-
-impl TryFrom<&Map<String, Value>> for Condition {
-    type Error = &'static str;
-    fn try_from(source: &Map<String, Value>) -> Result<Self, Self::Error> {
+    fn try_from_condition_map(source: &Map<String, Value>) -> Result<Self, &'static str> {
         if let Some(operator) = source.keys().next() {
-            let emty_vec = vec![];
-            let operands = source[operator].as_array().unwrap_or(&emty_vec);
+            let operands = Operands::from_iter(
+                source[operator]
+                    .as_array()
+                    .cloned()
+                    .ok_or("Invalid operands list for context")?,
+            );
 
-            let operator = Operator::from((operator.to_owned(), operands));
+            let operator = Operator::from((operator.to_owned(), &operands));
 
-            let dimension_name = operands
-                .iter()
-                .find_map(|item| match item.as_object() {
-                    Some(o) if o.contains_key("var") => {
-                        Some(o["var"].as_str().unwrap_or(""))
-                    }
-                    _ => None,
-                })
-                .unwrap_or("");
+            let dimension_name = Self::try_dimension_name_from_operands(&operands)?;
 
             return Ok(Condition {
                 operator,
-                dimension: dimension_name.to_owned(),
-                operands: Operands::from_iter(operands.to_owned()),
+                dimension: dimension_name,
+                operands: operands.to_owned(),
             });
         }
 
         Err("not a valid condition map")
     }
-}
 
-impl TryFrom<&Value> for Condition {
-    type Error = &'static str;
-    fn try_from(value: &Value) -> Result<Self, Self::Error> {
-        let obj = value
+    pub fn try_from_condition_json(source: &Value) -> Result<Self, &'static str> {
+        let obj = source
             .as_object()
             .ok_or("not a valid condition value, should be an object")?;
-        Condition::try_from(obj)
+        Condition::try_from_condition_map(obj)
     }
-}
 
-impl Into<Value> for Condition {
-    fn into(self) -> Value {
+    pub fn to_condition_json(self) -> Value {
         let operator = match self.operator {
             Operator::In | Operator::Has => "in".to_owned(),
             Operator::Is => "==".to_owned(),
@@ -213,12 +187,29 @@ impl Into<Value> for Condition {
     }
 }
 
-impl TryFrom<&Context> for Conditions {
-    type Error = &'static str;
-    fn try_from(context: &Context) -> Result<Self, Self::Error> {
-        Self::from_context_json(context.condition.clone())
+impl TryFrom<(Operator, String, SchemaType)> for Condition {
+    type Error = String;
+    fn try_from(
+        (operator, d_name, r#type): (Operator, String, SchemaType),
+    ) -> Result<Self, Self::Error> {
+        Ok(Condition {
+            dimension: d_name.clone(),
+            operator: operator.clone(),
+            operands: Operands::try_from((operator, d_name, r#type))?,
+        })
     }
 }
+
+#[derive(
+    Clone,
+    Debug,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    Serialize,
+    Deserialize,
+    Default,
+)]
+pub struct Conditions(pub Vec<Condition>);
 
 impl Conditions {
     pub fn from_context_json(context: Value) -> Result<Self, &'static str> {
@@ -231,24 +222,24 @@ impl Conditions {
                         .as_array()
                         .ok_or("failed to parse value of and as array")
                         .and_then(|arr| {
-                            arr.iter().map(Condition::try_from).collect::<Result<
-                                Vec<Condition>,
-                                &'static str,
-                            >>(
-                            )
+                            arr.iter()
+                                .map(Condition::try_from_condition_json)
+                                .collect::<Result<Vec<Condition>, &'static str>>()
                         }),
-                    None => Condition::try_from(obj).map(|v| vec![v]),
+                    None => Condition::try_from_condition_map(obj).map(|v| vec![v]),
                 })?,
         ))
     }
+    pub fn to_context_json(self) -> Value {
+        json!({
+            "and": self.iter().map(|v| Condition::to_condition_json(v.clone())).collect::<Vec<Value>>()
+        })
+    }
 }
 
-impl Into<Value> for Conditions {
-    fn into(self) -> Value {
-        let conditions = self
-            .iter()
-            .map(|v| v.clone().into())
-            .collect::<Vec<Value>>();
-        json!({ "and": conditions })
+impl TryFrom<&Context> for Conditions {
+    type Error = &'static str;
+    fn try_from(context: &Context) -> Result<Self, Self::Error> {
+        Self::from_context_json(context.condition.clone())
     }
 }

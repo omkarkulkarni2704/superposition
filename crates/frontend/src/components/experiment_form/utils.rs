@@ -20,7 +20,7 @@ pub async fn create_experiment(
     let payload = ExperimentCreateRequest {
         name,
         variants: FromIterator::from_iter(variants),
-        context: conditions.into(),
+        context: conditions.to_context_json()
     };
 
     let _ = validate_experiment(&payload)?;
