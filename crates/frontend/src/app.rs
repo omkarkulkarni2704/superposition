@@ -9,6 +9,8 @@ use crate::pages::experiment_list::ExperimentList;
 use crate::pages::function::{
     function_create::CreateFunctionView, function_list::FunctionList, FunctionPage,
 };
+use crate::pages::snapshot::Snapshot;
+use crate::pages::snapshot_list::SnapshotList;
 use crate::pages::{
     context_override::ContextOverride, custom_types::TypesPage,
     default_config::DefaultConfig, experiment::ExperimentPage, home::Home,
@@ -206,6 +208,30 @@ pub fn app(app_envs: Envs) -> impl IntoView {
                                     view! {
                                         <Layout>
                                             <TypesPage/>
+                                        </Layout>
+                                    }
+                                }
+                            />
+
+                            <Route
+                                ssr=SsrMode::Async
+                                path="/admin/:tenant/snapshots"
+                                view=move || {
+                                    view! {
+                                        <Layout>
+                                            <SnapshotList/>
+                                        </Layout>
+                                    }
+                                }
+                            />
+
+                            <Route
+                                ssr=SsrMode::Async
+                                path="/admin/:tenant/snapshots/:version"
+                                view=move || {
+                                    view! {
+                                        <Layout>
+                                            <Snapshot/>
                                         </Layout>
                                     }
                                 }

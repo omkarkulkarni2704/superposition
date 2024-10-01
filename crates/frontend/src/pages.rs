@@ -7,3 +7,5 @@ pub mod experiment_list;
 pub mod function;
 pub mod home;
 pub mod not_found;
+pub mod snapshot;
+pub mod snapshot_list;
