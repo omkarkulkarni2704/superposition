@@ -25,6 +25,11 @@ serde_json = { workspace = true }
 strum_macros = { workspace = true }
 superposition_types = { path = "../superposition_types", features = ["result"] }
 urlencoding = "~2.1.2"
+fred = { workspace = true }
+
+
+[features]
+# high-performance-mode = ["dep:fred"]
 
 [lints]
 workspace = true

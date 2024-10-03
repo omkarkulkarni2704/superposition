@@ -14,7 +14,10 @@ use crate::{
     helpers::generate_cac,
 };
 use actix_http::header::HeaderValue;
-use actix_web::web::{Json, Query};
+use actix_http::StatusCode;
+use actix_web::web::{Data, Json, Query};
+// #[cfg(feature = "high-performance-mode")]
+use actix_web::http::header::ContentType;
 use actix_web::{get, put, web, HttpRequest, HttpResponse, HttpResponseBuilder, Scope};
 use cac_client::{eval_cac, eval_cac_with_reasoning, MergeStrategy};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Timelike, Utc};
@@ -23,8 +26,12 @@ use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
     ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl,
 };
+// #[cfg(feature = "high-performance-mode")]
+use fred::interfaces::KeysInterface;
+// #[cfg(feature = "high-performance-mode")]
 use serde_json::{json, Map, Value};
-use superposition_macros::{bad_argument, db_error, unexpected_error};
+use service_utils::service::types::{AppState, Tenant};
+use superposition_macros::{bad_argument, db_error, response_error, unexpected_error};
 use superposition_types::{
     result as superposition, Cac, Condition, Overrides, PaginatedResponse, QueryFilters,
     TenantConfig, User,
@@ -40,7 +47,8 @@ use uuid::Uuid;
 
 pub fn endpoints() -> Scope {
     Scope::new("")
-        .service(get)
+        .service(get_config)
+        .service(get_config_fast)
         .service(get_resolved_config)
         .service(reduce_config)
         .service(get_config_versions)
@@ -536,8 +544,50 @@ async fn reduce_config(
     Ok(HttpResponse::Ok().json(config))
 }
 
+#[get("/fast")]
+async fn get_config_fast(
+    tenant: Tenant,
+    state: Data<AppState>,
+) -> superposition::Result<HttpResponse> {
+    log::debug!("Started redis fetch");
+    let config_key = format!("{}::cac_config", *tenant);
+    let max_created_key = format!("{}::cac_config::max_created_at", *tenant);
+    let audit_id_key = format!("{}::cac_config::audit_id", *tenant);
+    let config_version_key = format!("{}::cac_config::config_version", *tenant);
+    match state.redis.get::<String, String>(config_key.clone()).await {
+        Ok(config) => {
+            let mut response = HttpResponse::Ok();
+            if let Ok(max_created_at) =
+                state.redis.get::<String, String>(max_created_key).await
+            {
+                response
+                    .insert_header((AppHeader::LastModified.to_string(), max_created_at));
+            }
+            if let Ok(audit_id) = state.redis.get::<String, String>(audit_id_key).await {
+                response.insert_header((AppHeader::XAuditId.to_string(), audit_id));
+            }
+            if let Ok(config_version) = state
+                .redis
+                .get::<Option<i64>, String>(config_version_key)
+                .await
+            {
+                add_config_version_to_header(&config_version, &mut response);
+            }
+            response.insert_header(ContentType::json());
+            Ok(response.body(config))
+        }
+        Err(err) => {
+            log::info!("Could not get config in redis due to {}", err);
+            Err(response_error!(
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "could not fetch config, please try /config API"
+            ))
+        }
+    }
+}
+
 #[get("")]
-async fn get(
+async fn get_config(
     req: HttpRequest,
     db_conn: DbConnection,
 ) -> superposition::Result<HttpResponse> {
