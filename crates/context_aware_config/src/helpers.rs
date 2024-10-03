@@ -6,29 +6,37 @@ use crate::{
             config_versions,
             contexts::dsl::{self as ctxt},
             default_configs::dsl as def_conf,
-            event_log::dsl as event_log,
         },
     },
 };
+
+#[cfg(feature = "high-performance-mode")]
+use crate::db::schema::event_log::dsl as event_log;
+
 use actix_web::http::header::{HeaderMap, HeaderName, HeaderValue};
 use actix_web::web::Data;
-use chrono::{DateTime, Utc};
+#[cfg(feature = "high-performance-mode")]
+use chrono::DateTime;
+use chrono::Utc;
 use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
     ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl,
 };
-
+#[cfg(feature = "high-performance-mode")]
 use fred::interfaces::KeysInterface;
 use itertools::{self, Itertools};
 use jsonschema::{Draft, JSONSchema, ValidationError};
 use serde_json::{json, Map, Value};
+#[cfg(feature = "high-performance-mode")]
+use service_utils::service::types::Tenant;
 use service_utils::{
     helpers::{generate_snowflake_id, validation_err_to_str},
-    service::types::{AppState, Tenant},
+    service::types::AppState,
 };
 
 use superposition_macros::{db_error, unexpected_error, validation_error};
 use superposition_types::{result as superposition, Cac, Condition, Overrides};
+#[cfg(feature = "high-performance-mode")]
 use uuid::Uuid;
 
 use std::collections::HashMap;
@@ -313,6 +321,7 @@ pub fn add_config_version(
     Ok(version_id)
 }
 
+#[cfg(feature = "high-performance-mode")]
 pub async fn put_config_in_redis(
     version_id: i64,
     state: Data<AppState>,

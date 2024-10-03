@@ -14,10 +14,14 @@ use crate::{
     helpers::generate_cac,
 };
 use actix_http::header::HeaderValue;
+#[cfg(feature = "high-performance-mode")]
 use actix_http::StatusCode;
-use actix_web::web::{Data, Json, Query};
-// #[cfg(feature = "high-performance-mode")]
+
+#[cfg(feature = "high-performance-mode")]
 use actix_web::http::header::ContentType;
+#[cfg(feature = "high-performance-mode")]
+use actix_web::web::Data;
+use actix_web::web::{Json, Query};
 use actix_web::{get, put, web, HttpRequest, HttpResponse, HttpResponseBuilder, Scope};
 use cac_client::{eval_cac, eval_cac_with_reasoning, MergeStrategy};
 use chrono::{DateTime, NaiveDateTime, TimeZone, Timelike, Utc};
@@ -26,12 +30,14 @@ use diesel::{
     r2d2::{ConnectionManager, PooledConnection},
     ExpressionMethods, PgConnection, QueryDsl, RunQueryDsl,
 };
-// #[cfg(feature = "high-performance-mode")]
+#[cfg(feature = "high-performance-mode")]
 use fred::interfaces::KeysInterface;
-// #[cfg(feature = "high-performance-mode")]
 use serde_json::{json, Map, Value};
+#[cfg(feature = "high-performance-mode")]
 use service_utils::service::types::{AppState, Tenant};
-use superposition_macros::{bad_argument, db_error, response_error, unexpected_error};
+#[cfg(feature = "high-performance-mode")]
+use superposition_macros::response_error;
+use superposition_macros::{bad_argument, db_error, unexpected_error};
 use superposition_types::{
     result as superposition, Cac, Condition, Overrides, PaginatedResponse, QueryFilters,
     TenantConfig, User,
@@ -46,12 +52,14 @@ use service_utils::{
 use uuid::Uuid;
 
 pub fn endpoints() -> Scope {
-    Scope::new("")
+    let scope = Scope::new("")
         .service(get_config)
-        .service(get_config_fast)
         .service(get_resolved_config)
         .service(reduce_config)
-        .service(get_config_versions)
+        .service(get_config_versions);
+    #[cfg(feature = "high-performance-mode")]
+    let scope = scope.service(get_config_fast);
+    scope
 }
 
 fn validate_version_in_params(
@@ -544,6 +552,7 @@ async fn reduce_config(
     Ok(HttpResponse::Ok().json(config))
 }
 
+#[cfg(feature = "high-performance-mode")]
 #[get("/fast")]
 async fn get_config_fast(
     tenant: Tenant,

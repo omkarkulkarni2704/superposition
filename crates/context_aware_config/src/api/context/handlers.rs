@@ -20,8 +20,12 @@ use jsonschema::{Draft, JSONSchema, ValidationError};
 use serde_json::{from_value, json, Map, Value};
 use service_utils::{
     helpers::{parse_config_tags, validation_err_to_str},
-    service::types::{AppHeader, AppState, CustomHeaders, DbConnection, Tenant},
+    service::types::{AppHeader, AppState, CustomHeaders, DbConnection},
 };
+
+#[cfg(feature = "high-performance-mode")]
+use service_utils::service::types::Tenant;
+
 use superposition_macros::{
     bad_argument, db_error, not_found, unexpected_error, validation_error,
 };
@@ -44,9 +48,12 @@ use crate::{
     },
     helpers::{
         add_config_version, calculate_context_priority, json_to_sorted_string,
-        put_config_in_redis, validate_context_jsonschema,
+        validate_context_jsonschema,
     },
 };
+
+#[cfg(feature = "high-performance-mode")]
+use crate::helpers::put_config_in_redis;
 
 use super::helpers::{
     validate_condition_with_functions, validate_condition_with_mandatory_dimensions,
@@ -157,7 +164,6 @@ fn validate_override_with_default_configs(
     for (key, value) in override_.iter() {
         let schema = map
             .get(key)
-            // .map(|resp| resp)
             .ok_or(bad_argument!("failed to get schema for config key {}", key))?;
         let instance = value;
         let schema_compile_result = JSONSchema::options()
@@ -336,7 +342,7 @@ async fn put_handler(
     req: Json<PutReq>,
     mut db_conn: DbConnection,
     user: User,
-    tenant: Tenant,
+    #[cfg(feature = "high-performance-mode")] tenant: Tenant,
     tenant_config: TenantConfig,
 ) -> superposition::Result<HttpResponse> {
     let tags = parse_config_tags(custom_headers.config_tags)?;
@@ -356,8 +362,12 @@ async fn put_handler(
         ));
         Ok(http_resp.json(put_response))
     });
-    let DbConnection(mut conn) = db_conn;
-    put_config_in_redis(version_id, state, tenant, &mut conn).await?;
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "high-performance-mode")] {
+            let DbConnection(mut conn) = db_conn;
+            put_config_in_redis(version_id, state, tenant, &mut conn).await?;
+        }
+    }
     resp
 }
 
@@ -397,7 +407,7 @@ async fn update_override_handler(
     req: Json<PutReq>,
     mut db_conn: DbConnection,
     user: User,
-    tenant: Tenant,
+    #[cfg(feature = "high-performance-mode")] tenant: Tenant,
     tenant_config: TenantConfig,
 ) -> superposition::Result<HttpResponse> {
     let tags = parse_config_tags(custom_headers.config_tags)?;
@@ -419,8 +429,12 @@ async fn update_override_handler(
         ));
         Ok(http_resp.json(override_resp))
     });
-    let DbConnection(mut conn) = db_conn;
-    put_config_in_redis(version_id, state, tenant, &mut conn).await?;
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "high-performance-mode")] {
+            let DbConnection(mut conn) = db_conn;
+            put_config_in_redis(version_id, state, tenant, &mut conn).await?;
+        }
+    }
     resp
 }
 
@@ -522,7 +536,7 @@ async fn move_handler(
     req: Json<MoveReq>,
     mut db_conn: DbConnection,
     user: User,
-    tenant: Tenant,
+    #[cfg(feature = "high-performance-mode")] tenant: Tenant,
     tenant_config: TenantConfig,
 ) -> superposition::Result<HttpResponse> {
     let tags = parse_config_tags(custom_headers.config_tags)?;
@@ -549,8 +563,12 @@ async fn move_handler(
         ));
         Ok(http_resp.json(move_reponse))
     });
-    let DbConnection(mut conn) = db_conn;
-    put_config_in_redis(version_id, state, tenant, &mut conn).await?;
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "high-performance-mode")] {
+            let DbConnection(mut conn) = db_conn;
+            put_config_in_redis(version_id, state, tenant, &mut conn).await?;
+        }
+    }
     resp
 }
 
@@ -653,7 +671,7 @@ async fn delete_context(
     path: Path<String>,
     custom_headers: CustomHeaders,
     user: User,
-    tenant: Tenant,
+    #[cfg(feature = "high-performance-mode")] tenant: Tenant,
     mut db_conn: DbConnection,
 ) -> superposition::Result<HttpResponse> {
     let ctx_id = path.into_inner();
@@ -669,8 +687,12 @@ async fn delete_context(
             ))
             .finish())
     });
-    let DbConnection(mut conn) = db_conn;
-    put_config_in_redis(version_id, state, tenant, &mut conn).await?;
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "high-performance-mode")] {
+            let DbConnection(mut conn) = db_conn;
+            put_config_in_redis(version_id, state, tenant, &mut conn).await?;
+        }
+    }
     resp
 }
 
@@ -681,7 +703,7 @@ async fn bulk_operations(
     reqs: Json<Vec<ContextAction>>,
     db_conn: DbConnection,
     user: User,
-    tenant: Tenant,
+    #[cfg(feature = "high-performance-mode")] tenant: Tenant,
     tenant_config: TenantConfig,
 ) -> superposition::Result<HttpResponse> {
     use contexts::dsl::contexts;
@@ -757,6 +779,7 @@ async fn bulk_operations(
         // Commit the transaction
         Ok(http_resp.json(response))
     });
+    #[cfg(feature = "high-performance-mode")]
     put_config_in_redis(version_id, state, tenant, &mut conn).await?;
     resp
 }
@@ -766,7 +789,7 @@ async fn priority_recompute(
     state: Data<AppState>,
     custom_headers: CustomHeaders,
     db_conn: DbConnection,
-    tenant: Tenant,
+    #[cfg(feature = "high-performance-mode")] tenant: Tenant,
     _user: User,
 ) -> superposition::Result<HttpResponse> {
     use crate::db::schema::contexts::dsl::*;
@@ -832,6 +855,7 @@ async fn priority_recompute(
                 }
             }
         })?;
+    #[cfg(feature = "high-performance-mode")]
     put_config_in_redis(config_version_id, state, tenant, &mut conn).await?;
     let mut http_resp = HttpResponse::Ok();
     http_resp.insert_header((

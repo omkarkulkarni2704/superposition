@@ -1,10 +1,11 @@
 extern crate base64;
 use super::types::CreateReq;
+#[cfg(feature = "high-performance-mode")]
+use service_utils::service::types::Tenant;
 use service_utils::{
     helpers::{parse_config_tags, validation_err_to_str},
-    service::types::{AppHeader, AppState, CustomHeaders, DbConnection, Tenant},
+    service::types::{AppHeader, AppState, CustomHeaders, DbConnection},
 };
-
 use superposition_macros::{
     bad_argument, db_error, not_found, unexpected_error, validation_error,
 };
@@ -21,8 +22,12 @@ use crate::{
         models::{self, Context, DefaultConfig},
         schema::{contexts::dsl::contexts, default_configs::dsl},
     },
-    helpers::{add_config_version, put_config_in_redis},
+    helpers::add_config_version,
 };
+
+#[cfg(feature = "high-performance-mode")]
+use crate::helpers::put_config_in_redis;
+
 use actix_web::{
     delete, get, put,
     web::{self, Data, Json, Path},
@@ -48,7 +53,7 @@ async fn create(
     custom_headers: CustomHeaders,
     request: web::Json<CreateReq>,
     db_conn: DbConnection,
-    tenant: Tenant,
+    #[cfg(feature = "high-performance-mode")] tenant: Tenant,
     user: User,
 ) -> superposition::Result<HttpResponse> {
     let DbConnection(mut conn) = db_conn;
@@ -183,6 +188,7 @@ async fn create(
                 }
             }
         })?;
+    #[cfg(feature = "high-performance-mode")]
     put_config_in_redis(version_id, state, tenant, &mut conn).await?;
     let mut http_resp = HttpResponse::Ok();
 
@@ -240,7 +246,7 @@ async fn delete(
     path: Path<DefaultConfigKey>,
     custom_headers: CustomHeaders,
     db_conn: DbConnection,
-    tenant: Tenant,
+    #[cfg(feature = "high-performance-mode")] tenant: Tenant,
     user: User,
 ) -> superposition::Result<HttpResponse> {
     let DbConnection(mut conn) = db_conn;
@@ -288,6 +294,7 @@ async fn delete(
                     }
                 }
             });
+        #[cfg(feature = "high-performance-mode")]
         put_config_in_redis(version_id, state, tenant, &mut conn).await?;
         resp
     } else {

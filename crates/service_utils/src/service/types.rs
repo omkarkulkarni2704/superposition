@@ -51,7 +51,7 @@ pub struct AppState {
     pub service_prefix: String,
     pub tenant_configs: HashMap<String, TenantConfig>,
     pub superposition_token: String,
-    // #[cfg(feature = "high-performance-mode")]
+    #[cfg(feature = "high-performance-mode")]
     pub redis: fred::clients::RedisPool,
 }
 
