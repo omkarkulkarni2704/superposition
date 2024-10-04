@@ -12,7 +12,7 @@ use crate::{
     schema::{EnumVariants, HtmlDisplay, JsonSchemaType, SchemaType},
 };
 
-use super::context_form::types::Operator;
+use crate::logic::Operator;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum InputType {
@@ -139,11 +139,9 @@ fn parse_input(
     schema_type: SchemaType,
     op: &Option<Operator>,
 ) -> Result<Value, String> {
-    let parse_single = |r#type: &JsonSchemaType| {
-        match op {
-            Some(op) => parse_with_operator(&value, r#type, op),
-            None => parse(&value, r#type)
-        }
+    let parse_single = |r#type: &JsonSchemaType| match op {
+        Some(op) => parse_with_operator(&value, r#type, op),
+        None => parse(&value, r#type),
     };
 
     match schema_type {
@@ -478,13 +476,13 @@ pub fn monaco_input(
 pub fn input(
     value: Value,
     schema_type: SchemaType,
-    #[prop(into)]on_change: Callback<Value, ()>,
+    #[prop(into)] on_change: Callback<Value, ()>,
     #[prop(into)] r#type: InputType,
     #[prop(default = false)] disabled: bool,
     #[prop(into, default = String::new())] id: String,
     #[prop(into, default = String::new())] class: String,
     #[prop(into, default = String::new())] name: String,
-    #[prop(default = None)] operator: Option<Operator>
+    #[prop(default = None)] operator: Option<Operator>,
 ) -> impl IntoView {
     match r#type {
         InputType::Toggle => match value.as_bool() {

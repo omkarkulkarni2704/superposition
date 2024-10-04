@@ -1,5 +1,5 @@
 use super::types::{ExperimentCreateRequest, ExperimentUpdateRequest};
-use crate::components::context_form::types::Conditions;
+use crate::logic::Conditions;
 use crate::types::VariantFormT;
 use crate::utils::{construct_request_headers, get_host, parse_json_response, request};
 use serde_json::Value;
@@ -20,7 +20,7 @@ pub async fn create_experiment(
     let payload = ExperimentCreateRequest {
         name,
         variants: FromIterator::from_iter(variants),
-        context: conditions.to_context_json()
+        context: conditions.to_context_json(),
     };
 
     let _ = validate_experiment(&payload)?;

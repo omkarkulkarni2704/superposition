@@ -3,13 +3,13 @@ use crate::api::{delete_context, fetch_default_config, fetch_dimensions};
 use crate::components::alert::AlertType;
 use crate::components::button::Button;
 use crate::components::context_card::ContextCard;
-use crate::components::context_form::types::{Condition, Conditions, Operator};
 use crate::components::context_form::utils::{create_context, update_context};
 use crate::components::context_form::ContextForm;
 use crate::components::delete_modal::DeleteModal;
 use crate::components::drawer::{close_drawer, open_drawer, Drawer, DrawerBtn};
 use crate::components::override_form::OverrideForm;
 use crate::components::skeleton::{Skeleton, SkeletonVariant};
+use crate::logic::{Condition, Conditions, Operator};
 use crate::providers::alert_provider::enqueue_alert;
 use crate::providers::condition_collapse_provider::ConditionCollapseProvider;
 use crate::providers::editor_provider::EditorProvider;
@@ -114,17 +114,18 @@ fn form(
         />
 
         <div class="flex justify-start w-full mt-10">
-        { move || {
-            let loading = req_inprogess_rs.get();
-            view! {
-                <Button
-                    class="pl-[70px] pr-[70px] w-48 h-12".to_string()
-                    text="Submit".to_string()
-                    on_click=on_submit.clone()
-                    loading
-                />
-            }
-        }}
+            {move || {
+                let loading = req_inprogess_rs.get();
+                view! {
+                    <Button
+                        class="pl-[70px] pr-[70px] w-48 h-12".to_string()
+                        text="Submit".to_string()
+                        on_click=on_submit.clone()
+                        loading
+                    />
+                }
+            }}
+
         </div>
     }
 }
@@ -353,37 +354,33 @@ pub fn context_override() -> impl IntoView {
                             })
                             .collect::<Vec<(Context, Map<String, Value>)>>();
                         let is_empty = ctx_n_overrides.is_empty();
-
-
                         view! {
                             <Show when=move || is_empty>
                                 <div class="flex-row" style="margin-top:20rem;">
                                     <div class="flex justify-center text-gray-400">
-                                    <i class="ri-file-add-line ri-xl"></i>
+                                        <i class="ri-file-add-line ri-xl"></i>
                                     </div>
                                     <div class="flex mt-4 font-semibold items-center text-gray-400 text-xl justify-center">
-                                    "Start with creating an override"
+                                        "Start with creating an override"
                                     </div>
                                 </div>
                             </Show>
                             <ConditionCollapseProvider>
 
-                                {
-                                    ctx_n_overrides
-                                        .into_iter()
-                                        .map(|(context, overrides)| {
-                                            view! {
-                                                <ContextCard
-                                                    context=context
-                                                    overrides=overrides
-                                                    handle_edit=handle_context_edit
-                                                    handle_clone=handle_context_clone
-                                                    handle_delete=handle_context_delete
-                                                />
-                                            }
-                                        })
-                                        .collect_view()
-                                }
+                                {ctx_n_overrides
+                                    .into_iter()
+                                    .map(|(context, overrides)| {
+                                        view! {
+                                            <ContextCard
+                                                context=context
+                                                overrides=overrides
+                                                handle_edit=handle_context_edit
+                                                handle_clone=handle_context_clone
+                                                handle_delete=handle_context_delete
+                                            />
+                                        }
+                                    })
+                                    .collect_view()}
 
                             </ConditionCollapseProvider>
                         }

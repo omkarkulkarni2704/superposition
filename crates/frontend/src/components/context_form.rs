@@ -1,8 +1,8 @@
-pub mod types;
 pub mod utils;
 use std::collections::{HashMap, HashSet};
 
 use crate::components::input::{Input, InputType};
+use crate::logic::{Condition, Conditions, Operand, Operands, Operator};
 use crate::schema::EnumVariants;
 use crate::types::Dimension;
 use crate::{
@@ -12,8 +12,6 @@ use crate::{
 use leptos::*;
 use serde_json::Value;
 use web_sys::MouseEvent;
-
-use self::types::*;
 
 #[component]
 pub fn condition_input(
@@ -144,13 +142,13 @@ pub fn condition_input(
 #[component]
 pub fn context_form<NF>(
     handle_change: NF,
-    dimensions: Vec<Dimension>,
-    #[prop(default = false)] is_standalone: bool,
     context: Conditions,
-    #[prop(default = String::new())] heading_sub_text: String,
+    dimensions: Vec<Dimension>,
     #[prop(default = false)] disabled: bool,
-    #[prop(default = DropdownDirection::Right)] dropdown_direction: DropdownDirection,
     #[prop(default = false)] resolve_mode: bool,
+    #[prop(default = false)] is_standalone: bool,
+    #[prop(default = String::new())] heading_sub_text: String,
+    #[prop(default = DropdownDirection::Right)] dropdown_direction: DropdownDirection,
 ) -> impl IntoView
 where
     NF: Fn(Conditions) + 'static,
@@ -161,30 +159,25 @@ where
             .map(|v| (v.dimension.clone(), v.clone()))
             .collect::<HashMap<String, Dimension>>(),
     );
-    let (used_dimensions, set_used_dimensions) = create_signal(
+    let (used_dimensions_rs, used_dimensions_ws) = create_signal(
         context
             .iter()
             .map(|condition| condition.dimension.clone())
             .collect::<HashSet<String>>(),
     );
-    let (context, set_context) = create_signal(context.clone());
+    let (context_rs, context_ws) = create_signal(context.clone());
 
     let dimensions = StoredValue::new(dimensions);
     let mandatory_dimensions = StoredValue::new(
         dimensions
             .get_value()
             .into_iter()
-            .filter_map(|dim| {
-                if dim.mandatory {
-                    Some(dim.dimension)
-                } else {
-                    None
-                }
-            })
+            .filter(|dim| dim.mandatory)
+            .map(|dim| dim.dimension)
             .collect::<HashSet<String>>(),
     );
 
-    let last_idx = create_memo(move |_| context.get().len().max(1) - 1);
+    let last_idx = create_memo(move |_| context_rs.get().len().max(1) - 1);
 
     let on_click = move |event: MouseEvent| {
         event.prevent_default();
@@ -193,7 +186,7 @@ where
     };
 
     create_effect(move |_| {
-        let f_context = context.get(); // context will now be a Value
+        let f_context = context_rs.get(); // context will now be a Value
         logging::log!("Context form effect {:?}", f_context);
         handle_change(f_context.clone()); // handle_change now expects Value
     });
@@ -202,10 +195,10 @@ where
         let dimension_name = selected_dimension.dimension;
         let r#type = SchemaType::try_from(selected_dimension.schema).unwrap();
 
-        set_used_dimensions.update(|value: &mut HashSet<String>| {
+        used_dimensions_ws.update(|value: &mut HashSet<String>| {
             value.insert(dimension_name.clone());
         });
-        set_context.update(|value| {
+        context_ws.update(|value| {
             value.push(
                 Condition::try_from((Operator::Is, dimension_name, r#type)).unwrap(),
             )
@@ -214,7 +207,7 @@ where
 
     let on_operator_change = Callback::new(
         move |(idx, d_name, d_type, operator): (usize, String, SchemaType, Operator)| {
-            set_context.update(|v| {
+            context_ws.update(|v| {
                 if idx < v.len() {
                     v[idx].operator = operator.clone();
                     v[idx].operands = Operands::try_from((operator, d_name, d_type))
@@ -226,7 +219,7 @@ where
 
     let on_value_change =
         Callback::new(move |(idx, operand_idx, value): (usize, usize, Value)| {
-            set_context.update(|v| {
+            context_ws.update(|v| {
                 if idx < v.len() {
                     let operands = &(v[idx].operands);
                     if operand_idx < operands.len()
@@ -239,10 +232,10 @@ where
         });
 
     let on_remove = Callback::new(move |(idx, d_name): (usize, String)| {
-        set_used_dimensions.update(|value| {
+        used_dimensions_ws.update(|value| {
             value.remove(&d_name);
         });
-        set_context.update(|v| {
+        context_ws.update(|v| {
             v.remove(idx);
         });
     });
@@ -257,7 +250,7 @@ where
             </div>
             <div class="card w-full bg-slate-50">
                 <div class="card-body">
-                    <Show when=move || context.get().is_empty()>
+                    <Show when=move || context_rs.get().is_empty()>
                         <div class="flex justify-center">
                             <Dropdown
                                 dropdown_width="w-80"
@@ -272,7 +265,7 @@ where
                     </Show>
                     <For
                         each=move || {
-                            context
+                            context_rs
                                 .get()
                                 .0
                                 .into_iter()
@@ -346,7 +339,7 @@ where
                         }
                     />
 
-                    <Show when=move || { !context.get().is_empty() && !disabled }>
+                    <Show when=move || { !context_rs.get().is_empty() && !disabled }>
                         <div class="mt-4">
 
                             {move || {
@@ -354,7 +347,7 @@ where
                                     .get_value()
                                     .into_iter()
                                     .filter(|dimension| {
-                                        !used_dimensions.get().contains(&dimension.dimension)
+                                        !used_dimensions_rs.get().contains(&dimension.dimension)
                                     })
                                     .collect::<Vec<Dimension>>();
                                 view! {

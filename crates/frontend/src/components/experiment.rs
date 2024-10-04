@@ -4,10 +4,9 @@ use std::rc::Rc;
 
 use leptos::*;
 
-use crate::{components::{
-    context_form::types::{Condition, Operand},
-    table::Table,
-}, schema::HtmlDisplay};
+use crate::{components::table::Table, schema::HtmlDisplay};
+
+use crate::logic::{Condition, Operand};
 
 use self::utils::gen_variant_table;
 use crate::types::{Experiment, ExperimentStatusType};

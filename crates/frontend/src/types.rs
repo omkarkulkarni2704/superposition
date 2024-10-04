@@ -6,9 +6,8 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use derive_more::{Deref, DerefMut};
 use serde_json::{json, Map, Value};
 
-use crate::components::{
-    context_form::types::Conditions, dropdown::utils::DropdownOption,
-};
+use crate::components::dropdown::utils::DropdownOption;
+use crate::logic::Conditions;
 
 #[derive(Clone, Debug)]
 pub struct AppRoute {
