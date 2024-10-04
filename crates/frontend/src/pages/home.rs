@@ -348,7 +348,6 @@ pub fn home() -> impl IntoView {
                                                     context=Conditions::default()
                                                     heading_sub_text="Query your configs".to_string()
                                                     dropdown_direction=DropdownDirection::Right
-                                                    is_standalone=false
                                                     resolve_mode=true
                                                     handle_change=move |new_context| {
                                                         context_ws

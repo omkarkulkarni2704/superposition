@@ -146,11 +146,9 @@ where
                     let context = f_context.get();
                     view! {
                         <ContextForm
-                            // dimensions will now be a Vec<Dimension>
                             dimensions=dimensions.get_value()
                             context=context
                             handle_change=handle_context_form_change
-                            is_standalone=false
                             disabled=edit
                             heading_sub_text=String::from(
                                 "Define rules under which this experiment would run",

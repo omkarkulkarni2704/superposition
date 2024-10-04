@@ -11,7 +11,6 @@ use crate::{
 };
 use leptos::*;
 use serde_json::Value;
-use web_sys::MouseEvent;
 
 #[component]
 pub fn condition_input(
@@ -146,7 +145,6 @@ pub fn context_form<NF>(
     dimensions: Vec<Dimension>,
     #[prop(default = false)] disabled: bool,
     #[prop(default = false)] resolve_mode: bool,
-    #[prop(default = false)] is_standalone: bool,
     #[prop(default = String::new())] heading_sub_text: String,
     #[prop(default = DropdownDirection::Right)] dropdown_direction: DropdownDirection,
 ) -> impl IntoView
@@ -179,12 +177,6 @@ where
 
     let last_idx = create_memo(move |_| context_rs.get().len().max(1) - 1);
 
-    let on_click = move |event: MouseEvent| {
-        event.prevent_default();
-        logging::log!("Context form submit");
-        //TODO: submit logic for this
-    };
-
     create_effect(move |_| {
         let f_context = context_rs.get(); // context will now be a Value
         logging::log!("Context form effect {:?}", f_context);
@@ -193,27 +185,33 @@ where
 
     let on_select_dimension = Callback::new(move |selected_dimension: Dimension| {
         let dimension_name = selected_dimension.dimension;
-        let r#type = SchemaType::try_from(selected_dimension.schema).unwrap();
 
-        used_dimensions_ws.update(|value: &mut HashSet<String>| {
-            value.insert(dimension_name.clone());
-        });
-        context_ws.update(|value| {
-            value.push(
-                Condition::try_from((Operator::Is, dimension_name, r#type)).unwrap(),
-            )
-        });
+        if let Ok(r#type) = SchemaType::try_from(selected_dimension.schema) {
+            used_dimensions_ws.update(|value: &mut HashSet<String>| {
+                value.insert(dimension_name.clone());
+            });
+            context_ws.update(|value| {
+                value.push(
+                    Condition::try_from((Operator::Is, dimension_name, r#type)).unwrap(),
+                )
+            });
+        }
+        // TODO show alert in case of invalid dimension
     });
 
     let on_operator_change = Callback::new(
         move |(idx, d_name, d_type, operator): (usize, String, SchemaType, Operator)| {
-            context_ws.update(|v| {
-                if idx < v.len() {
-                    v[idx].operator = operator.clone();
-                    v[idx].operands = Operands::try_from((operator, d_name, d_type))
-                        .unwrap_or(Operands(vec![]))
-                }
-            })
+            if let Ok(operands) =
+                Operands::try_from((&operator, d_name.as_str(), &d_type))
+            {
+                context_ws.update(|v| {
+                    if idx < v.len() {
+                        v[idx].operator = operator;
+                        v[idx].operands = operands.clone();
+                    }
+                })
+            }
+            // TODO show alert in case of invalid dimension operator combinations
         },
     );
 
@@ -278,14 +276,22 @@ where
                         }
 
                         children=move |(idx, condition)| {
-                            let schema = dimension_map
+                            let (schema_type, enum_variants) = dimension_map
                                 .with_value(|v| {
-                                    v.get(&condition.dimension).unwrap().schema.clone()
+                                    // if this panics then something is wrong
+                                    let d = v.get(&condition.dimension).unwrap();
+                                    (
+                                        SchemaType::try_from(d.schema.clone()),
+                                        EnumVariants::try_from(d.schema.clone()),
+                                    )
                                 });
-                            let schema_type = store_value(
-                                SchemaType::try_from(schema.clone()).unwrap(),
-                            );
-                            let enum_variants = EnumVariants::try_from(schema);
+                            if schema_type.is_err() || enum_variants.is_err() {
+                                return view! {
+                                    <span class="text-sm red"> An error occured </span>
+                                }.into_view()
+                            }
+
+                            let schema_type = store_value(schema_type.unwrap());
                             let allow_remove = !disabled
                                 && !mandatory_dimensions.get_value().contains(&condition.dimension);
                             let input_type = store_value(
@@ -335,7 +341,7 @@ where
                                         view! {}.into_view()
                                     }
                                 }}
-                            }
+                            }.into_view()
                         }
                     />
 
@@ -368,12 +374,5 @@ where
                 </div>
             </div>
         </div>
-        <Show when=move || is_standalone>
-            <div class="flex justify-end">
-                <button class="btn" on:click:undelegated=on_click disabled=disabled>
-                    Save
-                </button>
-            </div>
-        </Show>
     }
 }

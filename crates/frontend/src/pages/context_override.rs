@@ -91,7 +91,6 @@ fn form(
         <ContextForm
             dimensions=dimensions.get_value()
             context=context.get_untracked()
-            is_standalone=false
             handle_change=move |new_context| {
                 set_context
                     .update(|value| {
@@ -104,7 +103,6 @@ fn form(
         <OverrideForm
             overrides=overrides.get_untracked()
             default_config=default_config
-            is_standalone=false
             handle_change=move |new_overrides| {
                 set_overrides
                     .update(|value| {
@@ -162,24 +160,19 @@ pub fn context_override() -> impl IntoView {
     let handle_context_create = Callback::new(move |_| {
         set_form_mode.set(Some(FormMode::Create));
         let PageResource { dimensions, .. } = page_resource.get().unwrap_or_default();
-        let context_with_mandatory_dimensions = dimensions
-            .into_iter()
+        let def_context = dimensions
+            .iter()
             .filter_map(|v| {
+                if !v.mandatory { return None; }
                 let dimension_name = v.dimension;
                 let r#type = SchemaType::try_from(v.schema).unwrap();
-
-                if v.mandatory {
-                    Some(
+                let condition = SchemaType::try_from(v.schema).map(|v| {
                         Condition::try_from((Operator::Is, dimension_name, r#type))
-                            .unwrap(),
-                    )
-                } else {
-                    None
-                }
+                });
             })
             .collect::<Conditions>();
         set_selected_data.set(Some(Data {
-            context: context_with_mandatory_dimensions,
+            context: def_context,
             overrides: vec![],
         }));
         open_drawer("context_and_override_drawer");

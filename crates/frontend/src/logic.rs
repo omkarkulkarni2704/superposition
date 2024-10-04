@@ -45,10 +45,10 @@ impl FromIterator<Value> for Operands {
     }
 }
 
-impl TryFrom<(Operator, String, SchemaType)> for Operands {
+impl TryFrom<(&Operator, &str, &SchemaType)> for Operands {
     type Error = String;
     fn try_from(
-        (operator, d_name, r#type): (Operator, String, SchemaType),
+        (operator, d_name, r#type): (&Operator, &str, &SchemaType),
     ) -> Result<Self, Self::Error> {
         match operator {
             Operator::Is => Ok(Operands(vec![
@@ -68,6 +68,7 @@ impl TryFrom<(Operator, String, SchemaType)> for Operands {
                 Operand::Dimension(json!({ "var": d_name })),
                 Operand::Value(r#type.default_value()),
             ])),
+            // TODO fix this as there will be cases of unsupported operators
             _ => Err(String::from("unsupported operator")),
         }
     }
@@ -230,7 +231,7 @@ impl TryFrom<(Operator, String, SchemaType)> for Condition {
         Ok(Condition {
             dimension: d_name.clone(),
             operator: operator.clone(),
-            operands: Operands::try_from((operator, d_name, r#type))?,
+            operands: Operands::try_from((&operator, d_name.as_str(), &r#type))?,
         })
     }
 }
