@@ -6,6 +6,7 @@ use leptos::*;
 use chrono::{prelude::Utc, TimeZone};
 use serde::{Deserialize, Serialize};
 
+use crate::components::context_form::types::Conditions;
 use crate::components::drawer::{close_drawer, Drawer, DrawerBtn};
 use crate::components::skeleton::Skeleton;
 use crate::components::table::types::TablePaginationProps;
@@ -228,7 +229,7 @@ pub fn experiment_list() -> impl IntoView {
                             <EditorProvider>
                                 <ExperimentForm
                                     name="".to_string()
-                                    context=vec![]
+                                    context=Conditions::default()
                                     variants=vec![]
                                     dimensions=dim.clone()
                                     default_config=def_conf.clone()

@@ -3,13 +3,24 @@ use std::fmt::Display;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
-use crate::{schema::SchemaType, types::Context};
+use crate::{
+    schema::{HtmlDisplay, SchemaType},
+    types::Context,
+};
 use derive_more::{Deref, DerefMut};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Operand {
     Value(serde_json::Value),
     Dimension(serde_json::Value),
+}
+
+impl Operand {
+    pub fn inner(self) -> Value {
+        match self {
+            Operand::Value(v) | Operand::Dimension(v) => v,
+        }
+    }
 }
 
 impl Operand {
@@ -79,6 +90,16 @@ impl Operator {
             "in" => Operator::In,
             "has" => Operator::Has,
             other => Operator::Other(other.to_string()),
+        }
+    }
+
+    pub fn to_condition_json_operator(self) -> String {
+        match self {
+            Self::Has => "has".to_owned(),
+            Self::Is => "is".to_owned(),
+            Self::In => "in".to_owned(),
+            Self::Between => "between".to_owned(),
+            Self::Other(o) => o,
         }
     }
 }
@@ -167,12 +188,7 @@ impl Condition {
     }
 
     pub fn to_condition_json(self) -> Value {
-        let operator = match self.operator {
-            Operator::In | Operator::Has => "in".to_owned(),
-            Operator::Is => "==".to_owned(),
-            Operator::Between => "<=".to_owned(),
-            Operator::Other(op) => op,
-        };
+        let operator = self.operator.to_condition_json_operator();
 
         let operands = self
             .operands
@@ -184,6 +200,25 @@ impl Condition {
             .collect::<Vec<Value>>();
 
         json!({ operator: operands })
+    }
+
+    pub fn to_condition_query_str(self) -> String {
+        let operator = self.operator.to_condition_json_operator();
+        let dimension = self.dimension;
+
+        let value = self
+            .operands
+            .iter()
+            .filter_map(|operand| {
+                if let Operand::Value(v) = operand {
+                    return Some(v.to_owned().html_display());
+                }
+                None
+            })
+            .collect::<Vec<String>>()
+            .join(",");
+
+        format!("{}{}{}", dimension, operator, value)
     }
 }
 
@@ -234,6 +269,18 @@ impl Conditions {
         json!({
             "and": self.iter().map(|v| Condition::to_condition_json(v.clone())).collect::<Vec<Value>>()
         })
+    }
+    pub fn to_query_string(self) -> String {
+        self.iter()
+            .map(|condition| condition.clone().to_condition_query_str())
+            .collect::<Vec<String>>()
+            .join("&")
+    }
+}
+
+impl FromIterator<Condition> for Conditions {
+    fn from_iter<T: IntoIterator<Item = Condition>>(iter: T) -> Self {
+        Conditions(iter.into_iter().collect::<Vec<Condition>>())
     }
 }
 

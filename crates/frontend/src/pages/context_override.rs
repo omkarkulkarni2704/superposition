@@ -2,10 +2,8 @@ use crate::api::fetch_config;
 use crate::api::{delete_context, fetch_default_config, fetch_dimensions};
 use crate::components::alert::AlertType;
 use crate::components::button::Button;
-use crate::components::condition_pills::types::{Condition, ConditionOperator};
-use crate::components::condition_pills::utils::extract_conditions;
 use crate::components::context_card::ContextCard;
-use crate::components::context_form::types::Conditions;
+use crate::components::context_form::types::{Condition, Conditions, Operator};
 use crate::components::context_form::utils::{create_context, update_context};
 use crate::components::context_form::ContextForm;
 use crate::components::delete_modal::DeleteModal;
@@ -15,6 +13,7 @@ use crate::components::skeleton::{Skeleton, SkeletonVariant};
 use crate::providers::alert_provider::enqueue_alert;
 use crate::providers::condition_collapse_provider::ConditionCollapseProvider;
 use crate::providers::editor_provider::EditorProvider;
+use crate::schema::SchemaType;
 use crate::types::{Config, Context, DefaultConfig, Dimension};
 use futures::join;
 use leptos::*;
@@ -164,18 +163,20 @@ pub fn context_override() -> impl IntoView {
         let PageResource { dimensions, .. } = page_resource.get().unwrap_or_default();
         let context_with_mandatory_dimensions = dimensions
             .into_iter()
-            .filter_map(|dim| {
-                if dim.mandatory {
-                    Some(Condition {
-                        left_operand: dim.dimension,
-                        operator: ConditionOperator::Other(String::from("")),
-                        right_operand: vec![],
-                    })
+            .filter_map(|v| {
+                let dimension_name = v.dimension;
+                let r#type = SchemaType::try_from(v.schema).unwrap();
+
+                if v.mandatory {
+                    Some(
+                        Condition::try_from((Operator::Is, dimension_name, r#type))
+                            .unwrap(),
+                    )
                 } else {
                     None
                 }
             })
-            .collect::<Vec<Condition>>();
+            .collect::<Conditions>();
         set_selected_data.set(Some(Data {
             context: context_with_mandatory_dimensions,
             overrides: vec![],
@@ -193,7 +194,7 @@ pub fn context_override() -> impl IntoView {
     let handle_context_edit =
         Callback::new(move |data: (Context, Map<String, Value>)| {
             let (context, overrides) = data;
-            let conditions = extract_conditions(&context.condition);
+            let conditions = Conditions::from_context_json(context.condition).unwrap();
 
             set_selected_data.set(Some(Data {
                 context: conditions,
@@ -207,7 +208,7 @@ pub fn context_override() -> impl IntoView {
     let handle_context_clone =
         Callback::new(move |data: (Context, Map<String, Value>)| {
             let (context, overrides) = data;
-            let conditions = extract_conditions(&context.condition);
+            let conditions = Conditions::from_context_json(context.condition).unwrap();
 
             set_selected_data.set(Some(Data {
                 context: conditions,
