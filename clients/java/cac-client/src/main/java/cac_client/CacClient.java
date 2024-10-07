@@ -10,7 +10,7 @@ public class CacClient {
     public interface RustLib {
         String cac_last_error_message();
 
-        int cac_new_client(String tenant, long updateFrequency, String hostName);
+        int cac_new_client(String tenant, long updateFrequency, String hostName, long cacheMaxCapacity);
 
         void cac_free_client(Pointer ptr);
 
@@ -39,8 +39,8 @@ public class CacClient {
         CacClient.rustLib = LibraryLoader.create(RustLib.class).load(libraryName);
     }
 
-    public int cacNewClient(String tenant, long updateFrequency, String hostName) throws CACClientException {
-        int result = rustLib.cac_new_client(tenant, updateFrequency, hostName);
+    public int cacNewClient(String tenant, long updateFrequency, String hostName, long cacheMaxCapacity) throws CACClientException {
+        int result = rustLib.cac_new_client(tenant, updateFrequency, hostName, cacheMaxCapacity);
         if (result > 0) {
             String errorMessage = rustLib.cac_last_error_message();
             throw new CACClientException("Failed to create new CAC client: " + errorMessage);

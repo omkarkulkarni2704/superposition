@@ -28,15 +28,20 @@ type CacClient struct {
 }
 
 // NewCacClient creates a new CacClient
-func NewCacClient(tenantName string, pollingFrequency int, cacHostName string) (*CacClient, error) {
+func NewCacClient(tenantName string, pollingFrequency int, cacHostName string, cacheMaxCapacity int) (*CacClient, error) {
 	if tenantName == "" {
 		return nil, errors.New("tenantName cannot be Empty")
 	}
 	if cacHostName == "" {
 		return nil, errors.New("cacHostName cannot be Empty")
 	}
+	if cacheMaxCapacity != nil {
+		cacheCapacity = C.ulong(cacheMaxCapacity)
+	} else {
+		cacheCapacity = nil
+	}
 	client := &CacClient{tenant: tenantName, pollingFrequency: pollingFrequency, cacHostName: cacHostName, delimiter: ","}
-	resp := C.cac_new_client(C.CString(tenantName), C.ulong(pollingFrequency), C.CString(cacHostName))
+	resp := C.cac_new_client(C.CString(tenantName), C.ulong(pollingFrequency), C.CString(cacHostName), cacheCapacity)
 	if resp == 1 {
 		errorMessage := client.GetLastErrorMessage()
 		fmt.Printf("Some Error Occur while creating new client: %s\n", errorMessage)

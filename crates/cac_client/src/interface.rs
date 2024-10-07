@@ -6,7 +6,7 @@ use std::{
 
 use crate::{utils::core::MapError, Client, MergeStrategy, CLIENT_FACTORY};
 use once_cell::sync::Lazy;
-use serde_json::{Map, Value};
+use serde_json::{from_str, Map, Value};
 use std::{
     cell::RefCell,
     ffi::{c_int, CString},
@@ -102,15 +102,25 @@ pub extern "C" fn cac_new_client(
     tenant: *const c_char,
     update_frequency: c_ulong,
     hostname: *const c_char,
+    cache_max_capacity: *const c_char,
 ) -> c_int {
     let duration = Duration::new(update_frequency, 0);
     let tenant = unwrap_safe!(cstring_to_rstring(tenant), return 1);
     let hostname = unwrap_safe!(cstring_to_rstring(hostname), return 1);
 
+    let max_capacity = if cache_max_capacity.is_null() {
+        None
+    } else {
+        let max_capacity_str =
+            unwrap_safe!(cstring_to_rstring(cache_max_capacity), return 1);
+        let max_capacity_val: u64 =
+            unwrap_safe!(from_str::<u64>(max_capacity_str.as_str()), return 1);
+        Some(max_capacity_val)
+    };
     // println!("Creating cac client thread for tenant {tenant}");
     CAC_RUNTIME.block_on(async move {
         match CLIENT_FACTORY
-            .create_client(tenant.clone(), duration, hostname)
+            .create_client(tenant.clone(), duration, hostname, max_capacity)
             .await
         {
             Ok(_) => 0,

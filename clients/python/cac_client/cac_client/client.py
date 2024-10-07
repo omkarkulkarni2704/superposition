@@ -35,7 +35,7 @@ class Config:
 class CacClient:
     rust_lib = ctypes.CDLL(lib_path)
 
-    rust_lib.cac_new_client.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p]
+    rust_lib.cac_new_client.argtypes = [ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_int]
     rust_lib.cac_new_client.restype = ctypes.c_int
 
     rust_lib.cac_get_client.argtypes = [ctypes.c_char_p]
@@ -66,16 +66,17 @@ class CacClient:
     rust_lib.cac_get_default_config.argtypes = [ctypes.c_char_p, ctypes.c_char_p]
     rust_lib.cac_get_default_config.restype = ctypes.c_char_p
 
-    def __init__(self, tenant_name: str, polling_frequency: int, cac_host_name: str):
+    def __init__(self, tenant_name: str, polling_frequency: int, cac_host_name: str, cache_max_capacity: int| None = None):
         if not tenant_name or not cac_host_name:
             raise ValueError("tenantName cannot be null or empty")
 
         self.tenant = tenant_name
         self.polling_frequency = polling_frequency
         self.cac_host_name = cac_host_name
+        self.cache_max_capacity = cache_max_capacity
 
         resp = self.rust_lib.cac_new_client(
-            self.tenant.encode(), self.polling_frequency, self.cac_host_name.encode())
+            self.tenant.encode(), self.polling_frequency, self.cac_host_name.encode(), self.cache_max_capacity)
         if resp == 1:
             error_message = self.get_cac_last_error_message()
             raise Exception("Error Occured while creating new client ", error_message)

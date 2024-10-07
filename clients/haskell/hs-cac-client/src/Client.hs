@@ -35,7 +35,7 @@ type Tenant = String
 type Error = String
 
 foreign import ccall unsafe "cac_new_client"
-    c_new_cac_client :: CTenant -> CULong -> CString -> IO CInt
+    c_new_cac_client :: CTenant -> CULong -> CString -> CULong -> IO CInt
 
 foreign import ccall unsafe "&cac_free_client"
     c_free_cac_client :: FunPtr (Ptr CacClient -> IO ())
@@ -80,12 +80,15 @@ getError = c_last_error_message
 cleanup :: [Ptr a] -> IO ()
 cleanup items = mapM free items $> ()
 
-createCacClient:: Tenant -> Integer -> String -> IO (Either Error ())
-createCacClient tenant frequency hostname = do
+createCacClient:: Tenant -> Integer -> String -> Maybe Integer -> IO (Either Error ())
+createCacClient tenant frequency hostname cacheMaxCapacity = do
     let duration = fromInteger frequency
     cTenant   <- newCAString tenant
     cHostname <- newCAString hostname
-    resp      <- c_new_cac_client cTenant duration cHostname
+    cacheCapacity <- case cacheMaxCapacity of
+        Just val -> fromInteger val
+        Nothing     -> return nullPtr
+    resp      <- c_new_cac_client cTenant duration cHostname cacheCapacity
     _         <- cleanup [cTenant, cHostname]
     case resp of
         0 -> pure $ Right ()
