@@ -1,8 +1,6 @@
 use std::time::Duration;
 
-use crate::components::condition_pills::{
-    types::Condition, Condition as ConditionComponent,
-};
+use crate::components::condition_pills::Condition as ConditionComponent;
 use crate::components::skeleton::{Skeleton, SkeletonVariant};
 use crate::logic::Conditions;
 use crate::providers::condition_collapse_provider::ConditionCollapseProvider;
@@ -112,7 +110,7 @@ fn all_context_view(config: Config) -> impl IntoView {
                             .iter()
                             .filter_map(|key| overrides.get(key).map(|o| rows(key, o, true)))
                             .collect();
-                        let conditions: Vec<Condition> = context.try_into().unwrap_or_default();
+                        let conditions: Conditions = context.try_into().unwrap_or_default();
                         view! {
                             <div class="card bg-base-100 shadow gap-4 p-6">
                                 <h3 class="card-title text-base timeline-box text-gray-800 bg-base-100 shadow-md font-mono m-0 w-max">

@@ -132,7 +132,7 @@ fn form(
 pub fn context_override() -> impl IntoView {
     let tenant_rs = use_context::<ReadSignal<String>>().unwrap();
 
-    let (selected_data, set_selected_data) = create_signal::<Option<Data>>(None);
+    let (selected_context_rs, selected_context_ws) = create_signal::<Option<Data>>(None);
     let (form_mode, set_form_mode) = create_signal::<Option<FormMode>>(None);
     let (modal_visible, set_modal_visible) = create_signal(false);
     let (delete_id, set_delete_id) = create_signal::<Option<String>>(None);
@@ -157,68 +157,76 @@ pub fn context_override() -> impl IntoView {
         },
     );
 
-    let handle_context_create = Callback::new(move |_| {
+    let on_create_context_click = Callback::new(move |_| {
         set_form_mode.set(Some(FormMode::Create));
         let PageResource { dimensions, .. } = page_resource.get().unwrap_or_default();
-        let def_context = dimensions
-            .iter()
-            .filter_map(|v| {
-                if !v.mandatory { return None; }
-                let dimension_name = v.dimension;
-                let r#type = SchemaType::try_from(v.schema).unwrap();
-                let condition = SchemaType::try_from(v.schema).map(|v| {
-                        Condition::try_from((Operator::Is, dimension_name, r#type))
-                });
-            })
-            .collect::<Conditions>();
-        set_selected_data.set(Some(Data {
-            context: def_context,
+        let mut default_ctx: Conditions = Conditions(vec![]);
+        for dim in dimensions.iter().filter(|v| v.mandatory) {
+            let r#type = SchemaType::try_from(dim.schema.clone());
+            if let Err(_) = r#type {
+                //TODO emit an alert and return
+                return;
+            }
+
+            let condition = Condition::try_from((
+                Operator::Is,
+                dim.dimension.clone(),
+                r#type.unwrap(),
+            ));
+            if let Err(_) = condition {
+                //TODO emit and alert and return
+                return;
+            }
+
+            default_ctx.push(condition.unwrap());
+        }
+
+        selected_context_ws.set(Some(Data {
+            context: default_ctx,
             overrides: vec![],
         }));
         open_drawer("context_and_override_drawer");
     });
 
-    let handle_submit = Callback::new(move |_| {
+    let on_submit = Callback::new(move |_| {
         close_drawer("context_and_override_drawer");
         set_form_mode.set(None);
-        set_selected_data.set(None);
+        selected_context_ws.set(None);
         page_resource.refetch();
     });
 
-    let handle_context_edit =
-        Callback::new(move |data: (Context, Map<String, Value>)| {
-            let (context, overrides) = data;
-            let conditions = Conditions::from_context_json(context.condition).unwrap();
+    let on_context_edit = Callback::new(move |data: (Context, Map<String, Value>)| {
+        let (context, overrides) = data;
+        let conditions = Conditions::from_context_json(context.condition).unwrap();
 
-            set_selected_data.set(Some(Data {
-                context: conditions,
-                overrides: overrides.into_iter().collect::<Vec<(String, Value)>>(),
-            }));
-            set_form_mode.set(Some(FormMode::Edit));
+        selected_context_ws.set(Some(Data {
+            context: conditions,
+            overrides: overrides.into_iter().collect::<Vec<(String, Value)>>(),
+        }));
+        set_form_mode.set(Some(FormMode::Edit));
 
-            open_drawer("context_and_override_drawer");
-        });
+        open_drawer("context_and_override_drawer");
+    });
 
-    let handle_context_clone =
-        Callback::new(move |data: (Context, Map<String, Value>)| {
-            let (context, overrides) = data;
-            let conditions = Conditions::from_context_json(context.condition).unwrap();
+    let on_context_clone = Callback::new(move |data: (Context, Map<String, Value>)| {
+        let (context, overrides) = data;
+        let conditions = Conditions::from_context_json(context.condition).unwrap();
 
-            set_selected_data.set(Some(Data {
-                context: conditions,
-                overrides: overrides.into_iter().collect::<Vec<(String, Value)>>(),
-            }));
-            set_form_mode.set(Some(FormMode::Create));
+        selected_context_ws.set(Some(Data {
+            context: conditions,
+            overrides: overrides.into_iter().collect::<Vec<(String, Value)>>(),
+        }));
+        set_form_mode.set(Some(FormMode::Create));
 
-            open_drawer("context_and_override_drawer");
-        });
+        open_drawer("context_and_override_drawer");
+    });
 
-    let handle_context_delete = Callback::new(move |id: String| {
+    let on_context_delete = Callback::new(move |id: String| {
         set_delete_id.set(Some(id.clone()));
         set_modal_visible.set(true);
     });
 
-    let confirm_delete = Callback::new(move |_| {
+    let on_delete_confirm = Callback::new(move |_| {
         if let Some(id) = delete_id.get().clone() {
             spawn_local(async move {
                 let result = delete_context(tenant_rs.get(), id).await;
@@ -244,7 +252,7 @@ pub fn context_override() -> impl IntoView {
                 <h2 class="card-title">Overrides</h2>
                 <DrawerBtn
                     drawer_id="context_and_override_drawer".to_string()
-                    on_click=handle_context_create
+                    on_click=on_create_context_click
                 >
                     Create Override
                     <i class="ri-edit-2-line ml-2"></i>
@@ -260,7 +268,7 @@ pub fn context_override() -> impl IntoView {
                         let PageResource { config: _, dimensions, default_config } = page_resource
                             .get()
                             .unwrap_or_default();
-                        let data = selected_data.get();
+                        let data = selected_context_rs.get();
                         let drawer_header = match form_mode.get() {
                             Some(FormMode::Edit) => "Update Overrides",
                             Some(FormMode::Create) => "Create Overrides",
@@ -273,7 +281,7 @@ pub fn context_override() -> impl IntoView {
                                 handle_close=move || {
                                     close_drawer("context_and_override_drawer");
                                     set_form_mode.set(None);
-                                    set_selected_data.set(None);
+                                    selected_context_ws.set(None);
                                 }
                             >
 
@@ -286,7 +294,7 @@ pub fn context_override() -> impl IntoView {
                                                     overrides=data.overrides
                                                     dimensions=dimensions
                                                     default_config=default_config
-                                                    handle_submit=handle_submit
+                                                    handle_submit=on_submit
                                                     edit=true
                                                 />
                                             }
@@ -300,7 +308,7 @@ pub fn context_override() -> impl IntoView {
                                                     overrides=overrides
                                                     dimensions=dimensions
                                                     default_config=default_config
-                                                    handle_submit=handle_submit
+                                                    handle_submit=on_submit
                                                     edit=false
                                                 />
                                             }
@@ -367,9 +375,9 @@ pub fn context_override() -> impl IntoView {
                                             <ContextCard
                                                 context=context
                                                 overrides=overrides
-                                                handle_edit=handle_context_edit
-                                                handle_clone=handle_context_clone
-                                                handle_delete=handle_context_delete
+                                                handle_edit=on_context_edit
+                                                handle_clone=on_context_clone
+                                                handle_delete=on_context_delete
                                             />
                                         }
                                     })
@@ -383,7 +391,7 @@ pub fn context_override() -> impl IntoView {
 
                 <DeleteModal
                     modal_visible=modal_visible
-                    confirm_delete=confirm_delete
+                    confirm_delete=on_delete_confirm
                     set_modal_visible=set_modal_visible
                     header_text="Are you sure you want to delete this context? Action is irreversible."
                         .to_string()

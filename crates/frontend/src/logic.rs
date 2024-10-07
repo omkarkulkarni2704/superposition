@@ -16,14 +16,6 @@ pub enum Operand {
 }
 
 impl Operand {
-    pub fn inner(self) -> Value {
-        match self {
-            Operand::Value(v) | Operand::Dimension(v) => v,
-        }
-    }
-}
-
-impl Operand {
     pub fn from_operand_json(value: Value) -> Self {
         match value {
             Value::Object(ref o) if o.contains_key("var") => Operand::Dimension(value),
