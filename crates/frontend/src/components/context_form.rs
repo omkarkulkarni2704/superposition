@@ -111,7 +111,7 @@ pub fn condition_input(
                                                 idx,
                                             )
 
-                                            class=""
+                                            class="w-100"
                                             name=""
                                             operator=Some(condition.with_value(|v| v.operator.clone()))
                                         />
@@ -301,6 +301,7 @@ where
                                     condition.operator.clone(),
                                 )),
                             );
+                            logging::log!("here {:?} {:?}",  input_type.get_value(), condition.operator);
                             let condition = store_value(condition);
                             let on_remove = move |d_name| on_remove.call((idx, d_name));
                             let on_value_change = move |(operand_idx, value)| {

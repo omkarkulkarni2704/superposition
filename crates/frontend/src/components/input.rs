@@ -70,12 +70,12 @@ impl From<(SchemaType, EnumVariants, Operator)> for InputType {
     fn from(
         (schema_type, enum_variants, operator): (SchemaType, EnumVariants, Operator),
     ) -> Self {
-        if !enum_variants.is_empty() {
-            return InputType::Select(enum_variants);
-        }
-
         if operator == Operator::In {
             return InputType::Text;
+        }
+
+        if !enum_variants.is_empty() {
+            return InputType::Select(enum_variants);
         }
 
         match schema_type {
@@ -121,15 +121,28 @@ fn parse_with_operator(
     op: &Operator,
 ) -> Result<Value, String> {
     match op {
-        Operator::In => {
-            let s_vec = serde_json::from_str::<Vec<String>>(s)
-                .map_err(|_| "not a valid array".to_string())?;
-            let mut val: Vec<Value> = vec![];
-            for s in s_vec.iter() {
-                val.push(parse(s, type_)?);
-            }
-            Ok(Value::Array(val))
-        }
+        Operator::In => match type_ {
+            JsonSchemaType::String => serde_json::from_str::<Vec<String>>(s)
+                .map(|v| json!(v))
+                .map_err(|_| "not a valid array of strings".to_string()),
+            JsonSchemaType::Number => serde_json::from_str::<Vec<f64>>(s)
+                .map(|v| json!(v))
+                .map_err(|_| "not a valid array of numbers".to_string()),
+            JsonSchemaType::Integer => serde_json::from_str::<Vec<i64>>(s)
+                .map(|v| json!(v))
+                .map_err(|_| "not a valid array of integers".to_string()),
+            JsonSchemaType::Boolean => serde_json::from_str::<Vec<bool>>(s)
+                .map(|v| json!(v))
+                .map_err(|_| "not a valid array of booleans".to_string()),
+            JsonSchemaType::Array => serde_json::from_str::<Vec<Value>>(s)
+                .map(|v| json!(v))
+                .map_err(|_| "not a valid array of arrays".to_string()),
+            JsonSchemaType::Object => serde_json::from_str::<Vec<Map<String, Value>>>(s)
+                .map(|v| json!(v))
+                .map_err(|_| "not a valid array of objects".to_string()),
+            JsonSchemaType::Null if s == "null" => Ok(Value::Null),
+            JsonSchemaType::Null => Err("not a null value".to_string()),
+        },
         _ => parse(s, type_),
     }
 }
