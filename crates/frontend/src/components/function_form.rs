@@ -230,58 +230,58 @@ pub fn test_form(function_name: String, stage: String) -> impl IntoView {
     };
 
     view! {
-            <div class="mx-auto w-auto" style="width: 250px">
+        <div class="mx-auto w-auto" style="width: 250px">
 
-                <form id="MyForm">
+            <form id="MyForm">
 
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Key Name</span>
-                        </label>
-                        <input
-                            disabled=false
-                            value=move || key.get()
-                            on:input=move |ev| set_key.set(event_target_value(&ev))
-                            type="text"
-                            name="key name"
-                            id="keyName"
-                            placeholder="key"
-                            class="input input-bordered"
-                        />
-                    </div>
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Key Name</span>
+                    </label>
+                    <input
+                        disabled=false
+                        value=move || key.get()
+                        on:input=move |ev| set_key.set(event_target_value(&ev))
+                        type="text"
+                        name="key name"
+                        id="keyName"
+                        placeholder="key"
+                        class="input input-bordered"
+                    />
+                </div>
 
-                    <div class="form-control">
-                        <label class="label">
-                            <span class="label-text">Value</span>
-                        </label>
-                        <textarea
-                            type="text"
-                            class="input input-bordered shadow-md"
-                            name="value"
-                            id="value"
-                            style="min-height: 150px"
-                            placeholder="value"
-                            on:change=move |ev| {
-                                let value = event_target_value(&ev);
-                                match from_str::<Value>(&value) {
-                                    Ok(test_val) => {
-                                        set_val.set(test_val);
-                                        set_error_message.set("".to_string());
-                                        set_output_message.set(None);
-                                    }
-                                    Err(_) => {
-                                        set_val.set(json!(value));
-                                        set_error_message.set("".to_string());
-                                        set_output_message.set(None);
-                                    }
-                                };
-                            }
-                        >
+                <div class="form-control">
+                    <label class="label">
+                        <span class="label-text">Value</span>
+                    </label>
+                    <textarea
+                        type="text"
+                        class="input input-bordered shadow-md"
+                        name="value"
+                        id="value"
+                        style="min-height: 150px"
+                        placeholder="value"
+                        on:change=move |ev| {
+                            let value = event_target_value(&ev);
+                            match from_str::<Value>(&value) {
+                                Ok(test_val) => {
+                                    set_val.set(test_val);
+                                    set_error_message.set("".to_string());
+                                    set_output_message.set(None);
+                                }
+                                Err(_) => {
+                                    set_val.set(json!(value));
+                                    set_error_message.set("".to_string());
+                                    set_output_message.set(None);
+                                }
+                            };
+                        }
+                    >
 
-                            {"".to_string()}
-                        </textarea>
+                        {"".to_string()}
+                    </textarea>
 
-                    </div>
+                </div>
 
                     <div class="flex justify-end mt-8">
                     { move || {
@@ -297,25 +297,25 @@ pub fn test_form(function_name: String, stage: String) -> impl IntoView {
                     }}
                     </div>
 
-                    <div class="mt-7">
-                        <p class="text-red-500">{move || error_message.get()}</p>
-                    </div>
+                <div class="mt-7">
+                    <p class="text-red-500">{move || error_message.get()}</p>
+                </div>
 
-                    <div>
-                        <p class="text-green-700">
-                            {move || {
-                                output_message
-                                    .get()
-                                    .map_or(
-                                        String::new(),
-                                        |o| { format!("{}\n{}", o.message, o.stdout) },
-                                    )
-                            }}
+                <div>
+                    <p class="text-green-700">
+                        {move || {
+                            output_message
+                                .get()
+                                .map_or(
+                                    String::new(),
+                                    |o| { format!("{}\n{}", o.message, o.stdout) },
+                                )
+                        }}
 
-                        </p>
-                    </div>
+                    </p>
+                </div>
 
-                </form>
-            </div>
+            </form>
+        </div>
     }
 }

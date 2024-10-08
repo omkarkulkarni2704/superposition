@@ -13,7 +13,7 @@ use crate::components::{experiment_form::ExperimentForm, stat::Stat, table::Tabl
 
 use crate::providers::condition_collapse_provider::ConditionCollapseProvider;
 use crate::providers::editor_provider::EditorProvider;
-use crate::types::{ExperimentsResponse, ListFilters};
+use crate::types::{ExpListFilters, Experiment, ListFilters, PaginatedResponse};
 
 use self::utils::experiment_table_columns;
 use crate::{
@@ -24,7 +24,7 @@ use serde_json::{json, Map, Value};
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 struct CombinedResource {
-    experiments: ExperimentsResponse,
+    experiments: PaginatedResponse<Experiment>,
     dimensions: Vec<Dimension>,
     default_config: Vec<DefaultConfig>,
 }
@@ -33,7 +33,7 @@ struct CombinedResource {
 pub fn experiment_list() -> impl IntoView {
     // acquire tenant
     let tenant_rs = use_context::<ReadSignal<String>>().unwrap();
-    let (filters, set_filters) = create_signal(ListFilters {
+    let (filters, set_filters) = create_signal(ExpListFilters {
         status: None,
         from_date: Utc.timestamp_opt(0, 0).single(),
         to_date: Utc.timestamp_opt(4130561031, 0).single(),
@@ -44,32 +44,50 @@ pub fn experiment_list() -> impl IntoView {
     let (reset_exp_form, set_exp_form) = create_signal(0);
     let table_columns = store_value(experiment_table_columns());
 
-    let combined_resource: Resource<(String, ListFilters), CombinedResource> =
+    let combined_resource: Resource<(String, ExpListFilters), CombinedResource> =
         create_blocking_resource(
             move || (tenant_rs.get(), filters.get()),
             |(current_tenant, filters)| async move {
                 // Perform all fetch operations concurrently
                 let experiments_future =
                     fetch_experiments(filters, current_tenant.to_string());
-                let dimensions_future = fetch_dimensions(current_tenant.to_string());
-                let config_future = fetch_default_config(current_tenant.to_string());
+                let empty_list_filters = ListFilters {
+                    page: None,
+                    count: None,
+                };
+                let dimensions_future = fetch_dimensions(
+                    empty_list_filters.clone(),
+                    current_tenant.to_string(),
+                );
+                let config_future =
+                    fetch_default_config(empty_list_filters, current_tenant.to_string());
 
                 let (experiments_result, dimensions_result, config_result) =
                     join!(experiments_future, dimensions_future, config_future);
-
                 // Construct the combined result, handling errors as needed
                 CombinedResource {
-                    experiments: experiments_result.unwrap_or(ExperimentsResponse {
+                    experiments: experiments_result.unwrap_or(PaginatedResponse {
                         total_items: 0,
                         total_pages: 0,
                         data: vec![],
                     }),
                     dimensions: dimensions_result
-                        .unwrap_or(vec![])
+                        .unwrap_or(PaginatedResponse {
+                            total_items: 0,
+                            total_pages: 0,
+                            data: vec![],
+                        })
+                        .data
                         .into_iter()
                         .filter(|d| d.dimension != "variantIds")
                         .collect(),
-                    default_config: config_result.unwrap_or(vec![]),
+                    default_config: config_result
+                        .unwrap_or(PaginatedResponse {
+                            total_items: 0,
+                            total_pages: 0,
+                            data: vec![],
+                        })
+                        .data,
                 }
             },
         );
@@ -193,7 +211,7 @@ pub fn experiment_list() -> impl IntoView {
                     let dim = combined_resource
                         .get()
                         .unwrap_or(CombinedResource {
-                            experiments: ExperimentsResponse {
+                            experiments: PaginatedResponse {
                                 total_items: 0,
                                 total_pages: 0,
                                 data: vec![],
@@ -205,7 +223,7 @@ pub fn experiment_list() -> impl IntoView {
                     let def_conf = combined_resource
                         .get()
                         .unwrap_or(CombinedResource {
-                            experiments: ExperimentsResponse {
+                            experiments: PaginatedResponse {
                                 total_items: 0,
                                 total_pages: 0,
                                 data: vec![],

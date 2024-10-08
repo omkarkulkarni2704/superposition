@@ -13,7 +13,7 @@ use crate::{
         dropdown::{Dropdown, DropdownBtnType, DropdownDirection},
         input_components::{BooleanToggle, EnumDropdown},
     },
-    types::{FunctionsName, TypeTemplate},
+    types::{FunctionsName, ListFilters, TypeTemplate},
     utils::get_key_type,
 };
 
@@ -54,8 +54,16 @@ where
         create_blocking_resource(
             move || tenant_rs.get(),
             |current_tenant| async move {
-                match fetch_functions(current_tenant).await {
-                    Ok(data) => data,
+                match fetch_functions(
+                    ListFilters {
+                        page: None,
+                        count: None,
+                    },
+                    current_tenant,
+                )
+                .await
+                {
+                    Ok(data) => data.data.into_iter().collect(),
                     Err(_) => vec![],
                 }
             },
