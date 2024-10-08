@@ -379,16 +379,21 @@ pub fn function_page() -> impl IntoView {
                                                                     function_rs
                                                                         .get()
                                                                         .published_code
-                                                                        .unwrap_or("// Code not published yet, publish function to see it here!".to_string()));
+                                                                        .unwrap_or(
+                                                                            "// Code not published yet, publish function to see it here!"
+                                                                                .to_string(),
+                                                                        ),
+                                                                );
                                                                 let on_change = move |value| fun_code_ws.set(value);
                                                                 view! {
                                                                     <Show when=move || { !is_test }>
                                                                         <MonacoEditor
-                                                                        node_id="pub_editor_fn"
-                                                                        data=fun_code_rs.get_untracked()
-                                                                        on_change=on_change
-                                                                        read_only=is_edit
-                                                                        classes=vec!["min-h-[500px]"]/>
+                                                                            node_id="pub_editor_fn"
+                                                                            data=fun_code_rs.get_untracked()
+                                                                            on_change=on_change
+                                                                            read_only=is_edit
+                                                                            classes=vec!["min-h-[500px]"]
+                                                                        />
                                                                     </Show>
 
                                                                     <Show when=move || { test_mode_rs.get() }>
@@ -417,7 +422,9 @@ pub fn function_page() -> impl IntoView {
                                                         }>
 
                                                             {
-                                                                let (fun_code_rs, fun_code_ws) = create_signal(function_rs.get().draft_code);
+                                                                let (fun_code_rs, fun_code_ws) = create_signal(
+                                                                    function_rs.get().draft_code,
+                                                                );
                                                                 let on_change = move |value| fun_code_ws.set(value);
                                                                 view! {
                                                                     <Show when=move || {
@@ -441,11 +448,12 @@ pub fn function_page() -> impl IntoView {
 
                                                                     <Show when=move || { should_show }>
                                                                         <MonacoEditor
-                                                                        node_id="code_editor_fn"
-                                                                        data=fun_code_rs.get_untracked()
-                                                                        on_change=on_change
-                                                                        read_only=is_edit
-                                                                        classes=vec!["min-h-[500px]"]/>
+                                                                            node_id="code_editor_fn"
+                                                                            data=fun_code_rs.get_untracked()
+                                                                            on_change=on_change
+                                                                            read_only=is_edit
+                                                                            classes=vec!["min-h-[500px]"]
+                                                                        />
 
                                                                     </Show>
 

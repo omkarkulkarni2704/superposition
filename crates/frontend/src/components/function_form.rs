@@ -161,17 +161,18 @@ where
                         </div>
 
                         <div class="flex justify-end mt-8">
-                        { move || {
-                            let loading = req_inprogess_rs.get();
-                            view! {
-                                <Button
-                                    class="pl-[70px] pr-[70px] w-48 h-12".to_string()
-                                    text="Submit".to_string()
-                                    on_click=on_submit.clone()
-                                    loading
-                                />
-                            }
-                        }}
+                            {move || {
+                                let loading = req_inprogess_rs.get();
+                                view! {
+                                    <Button
+                                        class="pl-[70px] pr-[70px] w-48 h-12".to_string()
+                                        text="Submit".to_string()
+                                        on_click=on_submit.clone()
+                                        loading
+                                    />
+                                }
+                            }}
+
                         </div>
 
                         <div class="flex">
@@ -283,8 +284,8 @@ pub fn test_form(function_name: String, stage: String) -> impl IntoView {
 
                 </div>
 
-                    <div class="flex justify-end mt-8">
-                    { move || {
+                <div class="flex justify-end mt-8">
+                    {move || {
                         let loading = req_inprogess_rs.get();
                         view! {
                             <Button
@@ -295,7 +296,8 @@ pub fn test_form(function_name: String, stage: String) -> impl IntoView {
                             />
                         }
                     }}
-                    </div>
+
+                </div>
 
                 <div class="mt-7">
                     <p class="text-red-500">{move || error_message.get()}</p>
