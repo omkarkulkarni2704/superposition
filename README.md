@@ -1,5 +1,6 @@
-# <a href="https://juspay.io/open-source/superposition" target="_blank"> Superposition </a> 
-
+<h1 <p align="center"> <a href="https://juspay.io/open-source/superposition" target="_blank"> Superposition </a> 
+</p>
+</h1>    
 <p align="center">
 <img src="https://juspay.io/images/superposition/logo.jpg" alttext="Superposition Logo" width="400">
 </p>
